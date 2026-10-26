@@ -8,6 +8,9 @@ import type {
   Booking,
   BookingDetails,
   BookingWithRoom,
+  CreateKioskDisplayInput,
+  KioskDisplay,
+  LayoutPreset,
   NewBooking,
   Profile,
   RescheduleRequest,
@@ -15,6 +18,9 @@ import type {
   RescheduleStatus,
   Role,
   Room,
+  CreateRoomInput,
+  UpdateRoomInput,
+  RoomLayout,
   UserSummary,
 } from "@/lib/data/types";
 
@@ -56,8 +62,12 @@ export interface Repository {
   saveGhlContactId(userId: string, contactId: string): Promise<void>;
 
   listActiveRooms(): Promise<Room[]>;
+  listAllRooms(options?: { includeArchived?: boolean }): Promise<Room[]>;
   getRoomBySlug(slug: string): Promise<Room | null>;
   getRoomById(id: string): Promise<Room | null>;
+  createRoom(input: CreateRoomInput): Promise<Room>;
+  updateRoom(id: string, input: UpdateRoomInput): Promise<Room>;
+  archiveRoom(id: string, archived: boolean): Promise<Room>;
 
   /**
    * Periods a room is taken, without requester details: pending and approved
@@ -119,6 +129,19 @@ export interface Repository {
   createAnnouncement(input: AnnouncementInput, createdBy: string): Promise<Announcement>;
   updateAnnouncement(id: string, input: Partial<AnnouncementInput>): Promise<Announcement | null>;
   deleteAnnouncement(id: string): Promise<Announcement | null>;
+
+  // Spandi Room Layout methods
+  getRoomLayout(roomId: string): Promise<RoomLayout | null>;
+  saveRoomLayout(roomId: string, layout: Omit<RoomLayout, "id" | "updatedAt">): Promise<RoomLayout>;
+  listLayoutPresets(): Promise<LayoutPreset[]>;
+  saveLayoutAsPreset(preset: Omit<LayoutPreset, "id">): Promise<LayoutPreset>;
+
+  // Tablet / TV Wall Kiosk Display methods
+  listKioskDisplays(): Promise<KioskDisplay[]>;
+  getKioskDisplayByToken(token: string): Promise<KioskDisplay | null>;
+  createKioskDisplay(input: CreateKioskDisplayInput): Promise<KioskDisplay>;
+  revokeKioskDisplay(id: string): Promise<boolean>;
+  touchKioskDisplay(token: string): Promise<void>;
 }
 
 /** Private object storage. Keys use the prefixes announcements/, rooms/ and maps/. */

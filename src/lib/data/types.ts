@@ -48,11 +48,69 @@ export interface Room {
   capacity: number;
   bestFor: string[];
   locationLabel: string;
+  building?: string;
+  floorLevel?: string;
+  dimensionsLM?: number;
+  dimensionsWM?: number;
+  airconHpTotal?: number;
+  baseWattageLightsAv?: number;
+  customStatus?: "auto" | "available" | "in_use" | "maintenance" | "cleaning";
+  customStatusMessage?: string | null;
+  customStatusSubtitle?: string | null;
+  roomAttributes?: Record<string, any>;
+  isArchived?: boolean;
   imagePath: string | null;
   mapImagePath: string | null;
   ghlCalendarId: string | null;
   isActive: boolean;
   displayOrder: number;
+}
+
+export interface CreateRoomInput {
+  name: string;
+  slug?: string;
+  shortDescription: string;
+  fullDescription?: string;
+  capacity: number;
+  bestFor?: string[];
+  locationLabel: string;
+  building?: string;
+  floorLevel?: string;
+  dimensionsLM?: number;
+  dimensionsWM?: number;
+  airconHpTotal?: number;
+  baseWattageLightsAv?: number;
+  customStatus?: "auto" | "available" | "in_use" | "maintenance" | "cleaning";
+  customStatusMessage?: string | null;
+  customStatusSubtitle?: string | null;
+  roomAttributes?: Record<string, any>;
+  imagePath?: string | null;
+  ghlCalendarId?: string | null;
+}
+
+export interface UpdateRoomInput {
+  name?: string;
+  slug?: string;
+  shortDescription?: string;
+  fullDescription?: string;
+  capacity?: number;
+  bestFor?: string[];
+  locationLabel?: string;
+  building?: string;
+  floorLevel?: string;
+  dimensionsLM?: number;
+  dimensionsWM?: number;
+  airconHpTotal?: number;
+  baseWattageLightsAv?: number;
+  customStatus?: "auto" | "available" | "in_use" | "maintenance" | "cleaning";
+  customStatusMessage?: string | null;
+  customStatusSubtitle?: string | null;
+  roomAttributes?: Record<string, any>;
+  imagePath?: string | null;
+  ghlCalendarId?: string | null;
+  isActive?: boolean;
+  isArchived?: boolean;
+  displayOrder?: number;
 }
 
 export type BookingSource = "web" | "whatsapp";
@@ -163,3 +221,72 @@ export interface AnnouncementInput {
   expiresAt: string | null;
   isPublished: boolean;
 }
+
+export type LayoutElementType =
+  | "stage"
+  | "podium"
+  | "sound_booth"
+  | "round_table"
+  | "rect_table"
+  | "chair_row"
+  | "pillar"
+  | "door"
+  | "aisle";
+
+export interface LayoutElement {
+  id: string;
+  type: LayoutElementType;
+  x: number; // in meters relative to room top-left
+  y: number; // in meters relative to room top-left
+  width: number; // in meters
+  length: number; // in meters (height on 2D plane)
+  rotation: 0 | 45 | 90 | 135 | 180 | 225 | 270 | 315;
+  label?: string;
+  seats?: number; // Calculated or configured seat count
+  // Custom props per element type
+  tableDiameterInches?: 36 | 48 | 60 | 72; // For round tables
+  tableDimensionsInches?: "30x72" | "30x96"; // For rect classroom tables
+  chairsPerRow?: number; // For chair rows
+  rowCount?: number; // For multi-row blocks
+  color?: string; // Optional custom color/accent
+}
+
+export interface RoomLayout {
+  id: string;
+  roomId: string;
+  name: string;
+  elements: LayoutElement[];
+  gridSnapMeters: number; // Default 0.5
+  totalSeats: number;
+  updatedAt: string;
+}
+
+export interface LayoutPreset {
+  id: string;
+  name: string;
+  description: string;
+  category: "worship" | "classroom" | "fellowship" | "prayer";
+  defaultCapacity: number;
+  elements: LayoutElement[];
+}
+
+export type KioskDisplayType = "door_sign" | "lobby_hub";
+
+export interface KioskDisplay {
+  id: string;
+  token: string;
+  displayType: KioskDisplayType;
+  roomId?: string | null;
+  label: string;
+  isActive: boolean;
+  lastSeenAt?: string | null;
+  createdAt: string;
+}
+
+export interface CreateKioskDisplayInput {
+  displayType: KioskDisplayType;
+  roomId?: string | null;
+  label: string;
+}
+
+

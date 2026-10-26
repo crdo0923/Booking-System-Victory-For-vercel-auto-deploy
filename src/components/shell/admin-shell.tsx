@@ -21,8 +21,10 @@ export function AdminShell({ user, pendingBookings, pendingUsers, children }: Ad
   const nav: NavItem[] = [
     { href: "/admin", label: "Overview", icon: "overview" },
     { href: "/admin/bookings", label: "Booking requests", icon: "requests", matchPrefix: true, count: pendingBookings },
+    { href: "/admin/rooms", label: "Rooms", icon: "rooms", matchPrefix: true },
     { href: "/admin/users", label: "Users", icon: "users", matchPrefix: true, count: pendingUsers },
     { href: "/admin/announcements", label: "Announcements", icon: "announcements", matchPrefix: true },
+    { href: "/admin/displays", label: "Displays", icon: "displays", matchPrefix: true },
   ];
 
   return (
@@ -60,7 +62,7 @@ export function AdminShell({ user, pendingBookings, pendingUsers, children }: Ad
             </div>
             <ScrollNav items={[...nav, { href: "/dashboard", label: "Member view", icon: "home" }]} />
           </header>
-          <main id="main" className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+          <main id="main" className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-9 has-[[data-full-bleed]]:max-w-none has-[[data-full-bleed]]:p-0">
             {children}
           </main>
         </div>

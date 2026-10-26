@@ -43,6 +43,14 @@ export interface RoomRow {
   capacity: number;
   best_for: string[] | null;
   location_label: string;
+  building?: string | null;
+  floor_level?: string | null;
+  dimensions_l_m?: number | string | null;
+  dimensions_w_m?: number | string | null;
+  aircon_hp_total?: number | string | null;
+  base_wattage_lights_av?: number | null;
+  room_attributes?: Record<string, string | number | boolean> | null;
+  is_archived?: boolean | null;
   image_path: string | null;
   map_image_path: string | null;
   ghl_calendar_id: string | null;
@@ -176,6 +184,14 @@ export function toRoom(row: RoomRow): Room {
     capacity: row.capacity,
     bestFor: row.best_for ?? [],
     locationLabel: row.location_label,
+    building: row.building ?? "Main Building",
+    floorLevel: row.floor_level ?? "Ground Floor",
+    dimensionsLM: row.dimensions_l_m ? Number(row.dimensions_l_m) : 10,
+    dimensionsWM: row.dimensions_w_m ? Number(row.dimensions_w_m) : 8,
+    airconHpTotal: row.aircon_hp_total ? Number(row.aircon_hp_total) : 5,
+    baseWattageLightsAv: row.base_wattage_lights_av ? Number(row.base_wattage_lights_av) : 1200,
+    roomAttributes: row.room_attributes ?? {},
+    isArchived: Boolean(row.is_archived),
     imagePath: row.image_path,
     mapImagePath: row.map_image_path,
     ghlCalendarId: row.ghl_calendar_id?.trim() || null,

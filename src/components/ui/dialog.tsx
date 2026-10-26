@@ -41,11 +41,11 @@ export function Dialog({ open, onClose, title, description, children, footer, lo
         if (event.target === ref.current && !locked) onClose();
       }}
       aria-labelledby={titleId}
-      className={cn("m-auto overflow-visible rounded-lg border-0 bg-transparent p-0 text-ink", widths[size])}
+      className={cn("m-auto overflow-visible rounded-lg border-0 bg-transparent p-0 text-ink max-h-[92vh]", widths[size])}
     >
       {open && (
-        <div className="animate-fade-up overflow-hidden rounded-lg bg-surface shadow-[0_24px_64px_-16px_rgb(22_24_29/0.35)]">
-          <div className="flex items-start justify-between gap-4 px-6 pt-5">
+        <div className="animate-fade-up flex flex-col max-h-[92vh] overflow-hidden rounded-lg bg-surface shadow-[0_24px_64px_-16px_rgb(22_24_29/0.35)]">
+          <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-2 shrink-0 border-b border-line/40">
             <div>
               <h2 id={titleId} className="title text-lg">
                 {title}
@@ -62,8 +62,8 @@ export function Dialog({ open, onClose, title, description, children, footer, lo
               <X className="size-[18px]" aria-hidden />
             </button>
           </div>
-          <div className="px-6 pt-4 pb-6">{children}</div>
-          {footer && <div className="flex justify-end gap-2 border-t border-line bg-canvas px-6 py-3.5">{footer}</div>}
+          <div className="px-6 pt-4 pb-6 overflow-y-auto flex-1 overscroll-contain">{children}</div>
+          {footer && <div className="flex justify-end gap-2 border-t border-line bg-canvas px-6 py-3.5 shrink-0">{footer}</div>}
         </div>
       )}
     </dialog>

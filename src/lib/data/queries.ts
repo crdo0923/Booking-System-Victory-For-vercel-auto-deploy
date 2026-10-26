@@ -23,3 +23,14 @@ export const getBookingCounts = cache(async () => {
 export const getUserCounts = cache(async () => (await getRepositoryForRequest()).countUsersByAccessStatus());
 
 export const getActiveRooms = cache(async () => (await getRepositoryForRequest()).listActiveRooms());
+
+export const getAllRooms = cache(async (options?: { includeArchived?: boolean }) => (await getRepositoryForRequest()).listAllRooms(options));
+
+export const getRoomLayout = cache(async (roomId: string) => (await getRepositoryForRequest()).getRoomLayout(roomId));
+
+export const getLayoutPresets = cache(async () => (await getRepositoryForRequest()).listLayoutPresets());
+
+export const getKioskDisplays = cache(async () => (await getRepositoryForRequest()).listKioskDisplays());
+
+export const getKioskDisplayByToken = cache(async (token: string) => (await getRepositoryForRequest()).getKioskDisplayByToken(token));
+

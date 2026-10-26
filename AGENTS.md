@@ -110,9 +110,12 @@ The member dashboard should feel like a modern digital church bulletin board, no
 - Do not silently fall back to mock data in production.
 - Avoid TODOs in critical functionality.
 
-## Workflow
+## Workflow & Agent Assignment
 - Inspect existing files before editing.
 - Research before designing.
+- **MANDATORY AGENT ASSIGNMENT:** Always and strictly use the `@fullstack-craft` subagent for ALL code changes, feature implementations, and UI/UX craftsmanship. Do NOT code directly in the main orchestrator agent.
+- **DEPLOYMENT & GIT CONSTRAINT:** Never deploy to Vercel and never push to git (`git push`) unless explicitly asked by the user. All testing must be kept on `localhost`.
+- **RICARDO'S SCOPE ONLY:** Stick strictly to Ricardo's assigned roadmap (Rooms CRUD, Spandi Layouts, Tablet/TV Displays, Inventory, Assets, RBAC). Leave Expenses/Electricity on hold.
 - Build the simplest correct implementation first.
 - Test what you build.
 - Fix problems before adding unnecessary features.

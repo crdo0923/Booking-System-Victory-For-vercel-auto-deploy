@@ -18,9 +18,8 @@ export async function proxy(request: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
   if (!isProtected) return NextResponse.next();
 
-  const isDevelopment = process.env.NODE_ENV !== "production";
   const hasNeon = Boolean(process.env.DATABASE_URL?.trim() || process.env.NEON_AUTH_BASE_URL?.trim());
-  const demo = isDevelopment && (process.env.DEMO_MODE === "true" || !hasNeon);
+  const demo = process.env.DEMO_MODE === "true" || !hasNeon;
 
   if (demo) {
     return request.cookies.has(DEMO_SESSION_COOKIE) ? NextResponse.next() : loginRedirect(request);

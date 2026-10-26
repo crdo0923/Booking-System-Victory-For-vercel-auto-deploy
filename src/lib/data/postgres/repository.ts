@@ -1,7 +1,7 @@
 import "server-only";
 import { asMember } from "@/lib/db/client";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type Repository } from "@/lib/data/repository";
-import type { AccessStatus, AnnouncementInput, RescheduleRequestDetails, RescheduleStatus } from "@/lib/data/types";
+import type { AccessStatus, AnnouncementInput, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomLayout } from "@/lib/data/types";
 import { PAST_DUE_MESSAGE, type BookingStatus } from "@/lib/domain/booking-rules";
 import { INACTIVE_PROMOTION_MESSAGE, LAST_ADMIN_MESSAGE, OWN_ROLE_MESSAGE, SAME_ROLE_MESSAGE } from "@/lib/domain/roles";
 import {
@@ -155,7 +155,15 @@ export function createPostgresRepository(actorId: string | null): Repository {
     },
 
     async listActiveRooms() {
-      const rows = await query<RoomRow>("listActiveRooms", "select * from public.rooms where is_active order by display_order, name");
+      const rows = await query<RoomRow>("listActiveRooms", "select * from public.rooms where is_active and not coalesce(is_archived, false) order by display_order, name");
+      return rows.map(toRoom);
+    },
+
+    async listAllRooms(options) {
+      const sql = options?.includeArchived
+        ? "select * from public.rooms order by display_order, name"
+        : "select * from public.rooms where not coalesce(is_archived, false) order by display_order, name";
+      const rows = await query<RoomRow>("listAllRooms", sql);
       return rows.map(toRoom);
     },
 
@@ -167,6 +175,104 @@ export function createPostgresRepository(actorId: string | null): Repository {
     async getRoomById(id) {
       const row = await first<RoomRow>("getRoomById", "select * from public.rooms where id = $1", [id]);
       return row ? toRoom(row) : null;
+    },
+
+    async createRoom(input) {
+      const slug = (input.slug?.trim() || input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")) || "room-" + Date.now();
+      const row = await first<RoomRow>(
+        "createRoom",
+        `insert into public.rooms (
+          name, slug, short_description, full_description, capacity, best_for, location_label,
+          building, floor_level, dimensions_l_m, dimensions_w_m, aircon_hp_total, base_wattage_lights_av,
+          room_attributes, image_path, ghl_calendar_id, is_active, is_archived, display_order
+        ) values (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true, false,
+          (select coalesce(max(display_order), 0) + 1 from public.rooms)
+        ) returning *`,
+        [
+          input.name.trim(),
+          slug,
+          input.shortDescription.trim(),
+          input.fullDescription?.trim() ?? input.shortDescription.trim(),
+          input.capacity,
+          input.bestFor ?? [],
+          input.locationLabel.trim(),
+          input.building?.trim() || "Main Building",
+          input.floorLevel?.trim() || "Ground Floor",
+          input.dimensionsLM ?? 10,
+          input.dimensionsWM ?? 8,
+          input.airconHpTotal ?? 5,
+          input.baseWattageLightsAv ?? 1200,
+          JSON.stringify(input.roomAttributes ?? {}),
+          input.imagePath ?? null,
+          input.ghlCalendarId?.trim() || null,
+        ],
+      );
+      if (!row) throw new RepositoryError("unknown", "Failed to create room.");
+      return toRoom(row);
+    },
+
+    async updateRoom(id, input) {
+      const current = await this.getRoomById(id);
+      if (!current) throw new RepositoryError("not_found", "Room not found.");
+      const row = await first<RoomRow>(
+        "updateRoom",
+        `update public.rooms set
+          name = coalesce($2, name),
+          slug = coalesce($3, slug),
+          short_description = coalesce($4, short_description),
+          full_description = coalesce($5, full_description),
+          capacity = coalesce($6, capacity),
+          best_for = coalesce($7, best_for),
+          location_label = coalesce($8, location_label),
+          building = coalesce($9, building),
+          floor_level = coalesce($10, floor_level),
+          dimensions_l_m = coalesce($11, dimensions_l_m),
+          dimensions_w_m = coalesce($12, dimensions_w_m),
+          aircon_hp_total = coalesce($13, aircon_hp_total),
+          base_wattage_lights_av = coalesce($14, base_wattage_lights_av),
+          room_attributes = coalesce($15, room_attributes),
+          image_path = coalesce($16, image_path),
+          ghl_calendar_id = coalesce($17, ghl_calendar_id),
+          is_active = coalesce($18, is_active),
+          is_archived = coalesce($19, is_archived),
+          display_order = coalesce($20, display_order)
+        where id = $1 returning *`,
+        [
+          id,
+          input.name?.trim(),
+          input.slug?.trim(),
+          input.shortDescription?.trim(),
+          input.fullDescription?.trim(),
+          input.capacity,
+          input.bestFor,
+          input.locationLabel?.trim(),
+          input.building?.trim(),
+          input.floorLevel?.trim(),
+          input.dimensionsLM,
+          input.dimensionsWM,
+          input.airconHpTotal,
+          input.baseWattageLightsAv,
+          input.roomAttributes ? JSON.stringify(input.roomAttributes) : null,
+          input.imagePath,
+          input.ghlCalendarId?.trim(),
+          input.isActive,
+          input.isArchived,
+          input.displayOrder,
+        ],
+      );
+      if (!row) throw new RepositoryError("unknown", "Failed to update room.");
+      return toRoom(row);
+    },
+
+    async archiveRoom(id, archived) {
+      const row = await first<RoomRow>(
+        "archiveRoom",
+        "update public.rooms set is_archived = $2, is_active = not $2 where id = $1 returning *",
+        [id, archived],
+      );
+      if (!row) throw new RepositoryError("not_found", "Room not found.");
+      return toRoom(row);
     },
 
     async getBusyRanges(roomId, from, to, options) {
@@ -498,6 +604,214 @@ export function createPostgresRepository(actorId: string | null): Repository {
     async deleteAnnouncement(id) {
       const row = await first<AnnouncementRow>("deleteAnnouncement", "delete from public.announcements where id = $1 returning *", [id]);
       return row ? toAnnouncement(row) : null;
+    },
+
+    async getRoomLayout(roomId) {
+      const room = await this.getRoomById(roomId);
+      if (!room || !room.roomAttributes || !room.roomAttributes.layout) return null;
+      return room.roomAttributes.layout as unknown as RoomLayout;
+    },
+
+    async saveRoomLayout(roomId, layout) {
+      const current = await this.getRoomById(roomId);
+      if (!current) throw new RepositoryError("not_found", "Room not found.");
+      const nowIso = new Date().toISOString();
+      const savedLayout: RoomLayout = {
+        id: (current.roomAttributes?.layout as { id?: string })?.id || `layout-${roomId}`,
+        roomId,
+        name: layout.name,
+        elements: layout.elements,
+        gridSnapMeters: layout.gridSnapMeters ?? 0.5,
+        totalSeats: layout.totalSeats ?? 0,
+        updatedAt: nowIso,
+      };
+
+      const updatedAttributes = {
+        ...(current.roomAttributes ?? {}),
+        layout: savedLayout,
+      };
+
+      await this.updateRoom(roomId, {
+        roomAttributes: updatedAttributes,
+      });
+
+      return savedLayout;
+    },
+
+    async listLayoutPresets() {
+      // Default standard church presets
+      return [
+        {
+          id: "preset-sunday-worship",
+          name: "Sunday Worship (Theater Rows)",
+          description: "Front elevated platform with pulpit, centered chair aisles, and rear sound/tech booth.",
+          category: "worship",
+          defaultCapacity: 48,
+          elements: [
+            { id: "elem-stage-1", type: "stage", x: 2.5, y: 0.5, width: 5.0, length: 2.0, rotation: 0, label: "Main Platform" },
+            { id: "elem-podium-1", type: "podium", x: 4.5, y: 1.2, width: 1.0, length: 0.8, rotation: 0, label: "Pulpit" },
+            { id: "elem-aisle-center", type: "aisle", x: 4.4, y: 3.0, width: 1.2, length: 4.5, rotation: 0, label: "Center Aisle" },
+            { id: "elem-rows-left", type: "chair_row", x: 1.0, y: 3.0, width: 3.0, length: 4.0, rotation: 0, chairsPerRow: 6, rowCount: 4, seats: 24, label: "Left Section (24 seats)" },
+            { id: "elem-rows-right", type: "chair_row", x: 6.0, y: 3.0, width: 3.0, length: 4.0, rotation: 0, chairsPerRow: 6, rowCount: 4, seats: 24, label: "Right Section (24 seats)" },
+            { id: "elem-booth-1", type: "sound_booth", x: 3.5, y: 7.2, width: 3.0, length: 1.2, rotation: 0, label: "Sound & Livestream Booth" },
+            { id: "elem-door-entry", type: "door", x: 8.5, y: 8.0, width: 1.2, length: 0.4, rotation: 0, label: "Rear Entry Door" },
+          ],
+        },
+        {
+          id: "preset-leadership-classroom",
+          name: "Leadership Workshop (Classroom)",
+          description: "Rectangular seminar tables with chairs facing front screen and speaker podium.",
+          category: "classroom",
+          defaultCapacity: 24,
+          elements: [
+            { id: "elem-podium-cls", type: "podium", x: 4.5, y: 0.8, width: 1.0, length: 0.8, rotation: 0, label: "Instructor Podium" },
+            { id: "elem-tbl-1", type: "rect_table", x: 1.5, y: 2.5, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 1 (3 pax)" },
+            { id: "elem-tbl-2", type: "rect_table", x: 6.0, y: 2.5, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 2 (3 pax)" },
+            { id: "elem-tbl-3", type: "rect_table", x: 1.5, y: 4.2, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 3 (3 pax)" },
+            { id: "elem-tbl-4", type: "rect_table", x: 6.0, y: 4.2, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 4 (3 pax)" },
+            { id: "elem-tbl-5", type: "rect_table", x: 1.5, y: 5.9, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 5 (3 pax)" },
+            { id: "elem-tbl-6", type: "rect_table", x: 6.0, y: 5.9, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 6 (3 pax)" },
+            { id: "elem-tbl-7", type: "rect_table", x: 1.5, y: 7.6, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 7 (3 pax)" },
+            { id: "elem-tbl-8", type: "rect_table", x: 6.0, y: 7.6, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 8 (3 pax)" },
+          ],
+        },
+        {
+          id: "preset-life-group-circle",
+          name: "Life Group Circle",
+          description: "60-inch round banquet tables arranged for intimate discipleship and discussion.",
+          category: "fellowship",
+          defaultCapacity: 32,
+          elements: [
+            { id: "elem-rnd-1", type: "round_table", x: 2.0, y: 1.5, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 1 (8 seats)" },
+            { id: "elem-rnd-2", type: "round_table", x: 6.0, y: 1.5, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 2 (8 seats)" },
+            { id: "elem-rnd-3", type: "round_table", x: 2.0, y: 4.8, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 3 (8 seats)" },
+            { id: "elem-rnd-4", type: "round_table", x: 6.0, y: 4.8, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 4 (8 seats)" },
+          ],
+        },
+        {
+          id: "preset-prayer-worship-open",
+          name: "Prayer & Worship Night (Open Front)",
+          description: "Front open ministry space for altar prayer, flanked by outer seating blocks.",
+          category: "prayer",
+          defaultCapacity: 30,
+          elements: [
+            { id: "elem-stage-pwn", type: "stage", x: 3.0, y: 0.5, width: 4.0, length: 1.5, rotation: 0, label: "Worship Team Platform" },
+            { id: "elem-aisle-open", type: "aisle", x: 2.5, y: 2.5, width: 5.0, length: 2.5, rotation: 0, label: "Open Prayer & Altar Area" },
+            { id: "elem-rows-pwn-l", type: "chair_row", x: 0.5, y: 5.5, width: 3.5, length: 3.0, rotation: 0, chairsPerRow: 5, rowCount: 3, seats: 15, label: "Left Seating (15 seats)" },
+            { id: "elem-rows-pwn-r", type: "chair_row", x: 6.0, y: 5.5, width: 3.5, length: 3.0, rotation: 0, chairsPerRow: 5, rowCount: 3, seats: 15, label: "Right Seating (15 seats)" },
+            { id: "elem-booth-pwn", type: "sound_booth", x: 4.0, y: 7.5, width: 2.0, length: 1.2, rotation: 0, label: "Audio Console" },
+          ],
+        },
+      ];
+    },
+
+    async saveLayoutAsPreset(preset) {
+      // In Postgres, return a synthesized preset
+      return {
+        id: "preset-" + Date.now(),
+        ...preset,
+      };
+    },
+
+    async listKioskDisplays() {
+      try {
+        const rows = await query<any>(
+          "listKioskDisplays",
+          `select id, token, display_type as "displayType", room_id as "roomId", label, is_active as "isActive", last_seen_at as "lastSeenAt", created_at as "createdAt"
+           from public.kiosk_displays
+           order by created_at desc`,
+        );
+        return rows.map((r) => ({
+          id: r.id,
+          token: r.token,
+          displayType: r.displayType,
+          roomId: r.roomId,
+          label: r.label,
+          isActive: Boolean(r.isActive),
+          lastSeenAt: r.lastSeenAt ? new Date(r.lastSeenAt).toISOString() : null,
+          createdAt: new Date(r.createdAt).toISOString(),
+        }));
+      } catch {
+        return [];
+      }
+    },
+
+    async getKioskDisplayByToken(token) {
+      try {
+        const r = await first<any>(
+          "getKioskDisplayByToken",
+          `select id, token, display_type as "displayType", room_id as "roomId", label, is_active as "isActive", last_seen_at as "lastSeenAt", created_at as "createdAt"
+           from public.kiosk_displays
+           where token = $1 and is_active = true
+           limit 1`,
+          [token],
+        );
+        if (!r) return null;
+        return {
+          id: r.id,
+          token: r.token,
+          displayType: r.displayType,
+          roomId: r.roomId,
+          label: r.label,
+          isActive: Boolean(r.isActive),
+          lastSeenAt: r.lastSeenAt ? new Date(r.lastSeenAt).toISOString() : null,
+          createdAt: new Date(r.createdAt).toISOString(),
+        };
+      } catch {
+        return null;
+      }
+    },
+
+    async createKioskDisplay(input) {
+      const token = `kiosk_${crypto.randomUUID().replace(/-/g, "")}`;
+      const r = await first<any>(
+        "createKioskDisplay",
+        `insert into public.kiosk_displays (display_type, room_id, label, token)
+         values ($1, $2, $3, $4)
+         returning id, token, display_type as "displayType", room_id as "roomId", label, is_active as "isActive", last_seen_at as "lastSeenAt", created_at as "createdAt"`,
+        [input.displayType, input.roomId ?? null, input.label, token],
+      );
+      if (!r) throw new RepositoryError("unknown", "Failed to create kiosk display.");
+      return {
+        id: r.id,
+        token: r.token,
+        displayType: r.displayType,
+        roomId: r.roomId,
+        label: r.label,
+        isActive: Boolean(r.isActive),
+        lastSeenAt: r.lastSeenAt ? new Date(r.lastSeenAt).toISOString() : null,
+        createdAt: new Date(r.createdAt).toISOString(),
+      };
+    },
+
+    async revokeKioskDisplay(id) {
+      try {
+        const rows = await query<any>(
+          "revokeKioskDisplay",
+          `update public.kiosk_displays
+           set is_active = false
+           where id = $1
+           returning id`,
+          [id],
+        );
+        return rows.length > 0;
+      } catch {
+        return false;
+      }
+    },
+
+    async touchKioskDisplay(token) {
+      try {
+        await query(
+          "touchKioskDisplay",
+          `update public.kiosk_displays
+           set last_seen_at = now()
+           where token = $1`,
+          [token],
+        );
+      } catch {
+        // Non-blocking telemetry
+      }
     },
   };
   return repo;

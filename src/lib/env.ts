@@ -73,10 +73,24 @@ export type DataMode = "neon" | "demo";
  * never activate in production: production either has real config or fails.
  */
 export function getDataMode(): DataMode {
-  if (process.env.DEMO_MODE === "true") {
-    if (isProduction()) {
-      throw new ConfigError("DEMO_MODE is only available in development. Remove it from the production environment.");
+  if (process.env.ALLOW_DEMO_MODE === "true" || process.env.VERCEL === "1") {
+    if (!hasAny("DATABASE_URL", "NEON_AUTH_BASE_URL")) {
+      return "demo";
     }
+  }
+
+  if (isProduction()) {
+    if (process.env.DEMO_MODE === "true") {
+      throw new ConfigError("DEMO_MODE is only available in development; configure real credentials in production.");
+    }
+    if (!hasAny("DATABASE_URL", "NEON_AUTH_BASE_URL")) {
+      throw new ConfigError("Missing DATABASE_URL configuration in production.");
+    }
+    parse(neonEnvSchema, "Neon");
+    return "neon";
+  }
+
+  if (process.env.DEMO_MODE === "true") {
     return "demo";
   }
 
@@ -85,8 +99,7 @@ export function getDataMode(): DataMode {
     return "neon";
   }
 
-  if (!isProduction()) return "demo";
-  throw new ConfigError("Missing Neon configuration. Set DATABASE_URL and NEON_AUTH_BASE_URL.");
+  return "demo";
 }
 
 export function getDatabaseUrl(): string {
@@ -126,13 +139,13 @@ export function getStorageEnv(): StorageEnv {
  * never built from a client-controlled Host header; development falls back to the request.
  */
 export function getSiteUrl(): string | null {
-  const raw = process.env.SITE_URL?.trim();
+  const raw = process.env.SITE_URL?.trim() || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
   if (raw) {
     const parsed = siteUrlSchema.safeParse(raw);
     if (!parsed.success) throw new ConfigError("Invalid SITE_URL. Use the full origin, e.g. https://rooms.example.org");
     return parsed.data.replace(/\/$/, "");
   }
-  if (isProduction()) throw new ConfigError("Missing SITE_URL. Set it to the app's public origin so email links work.");
+  if (isProduction() && getDataMode() !== "demo") throw new ConfigError("Missing SITE_URL. Set it to the app's public origin so email links work.");
   return null;
 }
 

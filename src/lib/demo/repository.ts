@@ -196,7 +196,12 @@ export function createDemoRepository(actorId: string | null = null): Repository 
     },
 
     async listActiveRooms() {
-      return copy(state.rooms.filter((r) => r.isActive).sort((a, b) => a.displayOrder - b.displayOrder));
+      return copy(state.rooms.filter((r) => r.isActive && !r.isArchived).sort((a, b) => a.displayOrder - b.displayOrder));
+    },
+
+    async listAllRooms(options) {
+      const filtered = options?.includeArchived ? state.rooms : state.rooms.filter((r) => !r.isArchived);
+      return copy(filtered.sort((a, b) => a.displayOrder - b.displayOrder));
     },
 
     async getRoomBySlug(slug) {
@@ -205,6 +210,64 @@ export function createDemoRepository(actorId: string | null = null): Repository 
 
     async getRoomById(id) {
       return copy(state.rooms.find((r) => r.id === id) ?? null);
+    },
+
+    async createRoom(input) {
+      const slug = (input.slug?.trim() || input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")) || "room-" + Date.now();
+      const existing = state.rooms.find((r) => r.slug === slug);
+      if (existing) throw new RepositoryError("duplicate", `A room with slug "${slug}" already exists.`);
+      const newRoom = {
+        id: randomUUID(),
+        name: input.name.trim(),
+        slug,
+        shortDescription: input.shortDescription.trim(),
+        fullDescription: input.fullDescription?.trim() ?? input.shortDescription.trim(),
+        capacity: input.capacity,
+        bestFor: input.bestFor ?? [],
+        locationLabel: input.locationLabel.trim(),
+        building: input.building?.trim() || "Main Building",
+        floorLevel: input.floorLevel?.trim() || "Ground Floor",
+        dimensionsLM: input.dimensionsLM ?? 10,
+        dimensionsWM: input.dimensionsWM ?? 8,
+        airconHpTotal: input.airconHpTotal ?? 5,
+        baseWattageLightsAv: input.baseWattageLightsAv ?? 1200,
+        roomAttributes: input.roomAttributes ?? {},
+        isArchived: false,
+        isActive: true,
+        imagePath: input.imagePath ?? null,
+        mapImagePath: null,
+        ghlCalendarId: input.ghlCalendarId ?? null,
+        displayOrder: state.rooms.length + 1,
+      };
+      state.rooms.push(newRoom);
+      return copy(newRoom);
+    },
+
+    async updateRoom(id, input) {
+      const index = state.rooms.findIndex((r) => r.id === id);
+      if (index === -1) throw new RepositoryError("not_found", "Room not found.");
+      const current = state.rooms[index];
+      const updated = {
+        ...current,
+        ...input,
+        name: input.name !== undefined ? input.name.trim() : current.name,
+        slug: input.slug !== undefined ? input.slug.trim() : current.slug,
+        shortDescription: input.shortDescription !== undefined ? input.shortDescription.trim() : current.shortDescription,
+        fullDescription: input.fullDescription !== undefined ? input.fullDescription.trim() : current.fullDescription,
+        capacity: input.capacity !== undefined ? input.capacity : current.capacity,
+        bestFor: input.bestFor !== undefined ? input.bestFor : current.bestFor,
+        locationLabel: input.locationLabel !== undefined ? input.locationLabel.trim() : current.locationLabel,
+      };
+      state.rooms[index] = updated;
+      return copy(updated);
+    },
+
+    async archiveRoom(id, archived) {
+      const room = state.rooms.find((r) => r.id === id);
+      if (!room) throw new RepositoryError("not_found", "Room not found.");
+      room.isArchived = archived;
+      room.isActive = !archived;
+      return copy(room);
     },
 
     async getBusyRanges(roomId, from, to, options) {
@@ -566,6 +629,85 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       if (index === -1) return null;
       const [removed] = state.announcements.splice(index, 1);
       return copy(removed);
+    },
+
+    async getRoomLayout(roomId) {
+      const layout = state.layouts.get(roomId);
+      return layout ? copy(layout) : null;
+    },
+
+    async saveRoomLayout(roomId, layout) {
+      const nowIso = new Date().toISOString();
+      const existing = state.layouts.get(roomId);
+      const saved = {
+        id: existing ? existing.id : randomUUID(),
+        roomId,
+        name: layout.name,
+        elements: layout.elements,
+        gridSnapMeters: layout.gridSnapMeters ?? 0.5,
+        totalSeats: layout.totalSeats ?? 0,
+        updatedAt: nowIso,
+      };
+      state.layouts.set(roomId, saved);
+      return copy(saved);
+    },
+
+    async listLayoutPresets() {
+      return copy(state.presets);
+    },
+
+    async saveLayoutAsPreset(preset) {
+      const newPreset = {
+        id: randomUUID(),
+        ...preset,
+      };
+      state.presets.push(newPreset);
+      return copy(newPreset);
+    },
+
+    async listKioskDisplays() {
+      state.kioskDisplays ??= [];
+      return copy(state.kioskDisplays);
+    },
+
+    async getKioskDisplayByToken(token) {
+      state.kioskDisplays ??= [];
+      const display = state.kioskDisplays.find((d) => d.token === token && d.isActive);
+      return display ? copy(display) : null;
+    },
+
+    async createKioskDisplay(input) {
+      state.kioskDisplays ??= [];
+      const token = `kiosk_${randomUUID().replace(/-/g, "")}`;
+      const nowIso = new Date().toISOString();
+      const newDisplay = {
+        id: randomUUID(),
+        token,
+        displayType: input.displayType,
+        roomId: input.roomId ?? null,
+        label: input.label,
+        isActive: true,
+        lastSeenAt: null,
+        createdAt: nowIso,
+      };
+      state.kioskDisplays.push(newDisplay);
+      return copy(newDisplay);
+    },
+
+    async revokeKioskDisplay(id) {
+      state.kioskDisplays ??= [];
+      const display = state.kioskDisplays.find((d) => d.id === id);
+      if (!display) return false;
+      display.isActive = false;
+      return true;
+    },
+
+    async touchKioskDisplay(token) {
+      state.kioskDisplays ??= [];
+      const display = state.kioskDisplays.find((d) => d.token === token);
+      if (display) {
+        display.lastSeenAt = new Date().toISOString();
+      }
     },
   };
 }

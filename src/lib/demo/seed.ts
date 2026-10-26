@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import type { Announcement, Booking, Room } from "@/lib/data/types";
+import type { Announcement, Booking, KioskDisplay, LayoutPreset, Room, RoomLayout } from "@/lib/data/types";
 import { addDaysToKey, dateKeyInZone, zonedDateTime } from "@/lib/domain/time";
 import { hashDemoPassword } from "@/lib/demo/passwords";
 import type { DemoState, DemoUser } from "@/lib/demo/store";
@@ -43,6 +43,9 @@ const rooms: Room[] = [
     capacity: 40,
     bestFor: ["Sunday school", "Workshops", "Training"],
     locationLabel: "2nd floor, east wing",
+    customStatus: "available",
+    customStatusMessage: "Available for Ministry",
+    customStatusSubtitle: "Open for discipleship, ministry meetings, and personal prayer until the next scheduled booking.",
   }),
   room(2, {
     name: "Room B",
@@ -53,6 +56,9 @@ const rooms: Room[] = [
     capacity: 30,
     bestFor: ["Youth activities", "Teen gatherings", "Games"],
     locationLabel: "2nd floor, east wing",
+    customStatus: "in_use",
+    customStatusMessage: "Youth Band Rehearsal",
+    customStatusSubtitle: "Sound check and rehearsal in progress. Please do not disturb.",
   }),
   room(3, {
     name: "Room C",
@@ -63,6 +69,9 @@ const rooms: Room[] = [
     capacity: 16,
     bestFor: ["Ministry meetings", "Planning sessions"],
     locationLabel: "2nd floor, west wing",
+    customStatus: "maintenance",
+    customStatusMessage: "Facility Maintenance",
+    customStatusSubtitle: "Air conditioning servicing and lighting repair underway. Closed until 4:00 PM.",
   }),
   room(4, {
     name: "Room D",
@@ -73,6 +82,9 @@ const rooms: Room[] = [
     capacity: 12,
     bestFor: ["Small groups", "Prayer meetings", "Mentoring"],
     locationLabel: "2nd floor, west wing",
+    customStatus: "cleaning",
+    customStatusMessage: "Post-Service Sanitizing",
+    customStatusSubtitle: "Routine room cleaning and chair resetting in progress. Opens shortly.",
   }),
   room(5, {
     name: "Event's Place - A",
@@ -83,6 +95,7 @@ const rooms: Room[] = [
     capacity: 50,
     bestFor: ["Church activities", "Internal events", "Rehearsals"],
     locationLabel: "Ground floor, beside the lobby",
+    customStatus: "auto",
   }),
 ];
 
@@ -204,6 +217,115 @@ export function createDemoSeed(): DemoState {
     }),
   ];
 
+  const presets: LayoutPreset[] = [
+    {
+      id: "preset-sunday-worship",
+      name: "Sunday Worship (Theater Rows)",
+      description: "Front elevated platform with pulpit, centered chair aisles, and rear sound/tech booth.",
+      category: "worship",
+      defaultCapacity: 48,
+      elements: [
+        { id: "elem-stage-1", type: "stage", x: 2.5, y: 0.5, width: 5.0, length: 2.0, rotation: 0, label: "Main Platform" },
+        { id: "elem-podium-1", type: "podium", x: 4.5, y: 1.2, width: 1.0, length: 0.8, rotation: 0, label: "Pulpit" },
+        { id: "elem-aisle-center", type: "aisle", x: 4.4, y: 3.0, width: 1.2, length: 4.5, rotation: 0, label: "Center Aisle" },
+        { id: "elem-rows-left", type: "chair_row", x: 1.0, y: 3.0, width: 3.0, length: 4.0, rotation: 0, chairsPerRow: 6, rowCount: 4, seats: 24, label: "Left Section (24 seats)" },
+        { id: "elem-rows-right", type: "chair_row", x: 6.0, y: 3.0, width: 3.0, length: 4.0, rotation: 0, chairsPerRow: 6, rowCount: 4, seats: 24, label: "Right Section (24 seats)" },
+        { id: "elem-booth-1", type: "sound_booth", x: 3.5, y: 7.2, width: 3.0, length: 1.2, rotation: 0, label: "Sound & Livestream Booth" },
+        { id: "elem-door-entry", type: "door", x: 8.5, y: 8.0, width: 1.2, length: 0.4, rotation: 0, label: "Rear Entry Door" },
+      ],
+    },
+    {
+      id: "preset-leadership-classroom",
+      name: "Leadership Workshop (Classroom)",
+      description: "Rectangular seminar tables with chairs facing front screen and speaker podium.",
+      category: "classroom",
+      defaultCapacity: 24,
+      elements: [
+        { id: "elem-podium-cls", type: "podium", x: 4.5, y: 0.8, width: 1.0, length: 0.8, rotation: 0, label: "Instructor Podium" },
+        { id: "elem-tbl-1", type: "rect_table", x: 1.5, y: 2.5, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 1 (3 pax)" },
+        { id: "elem-tbl-2", type: "rect_table", x: 6.0, y: 2.5, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 2 (3 pax)" },
+        { id: "elem-tbl-3", type: "rect_table", x: 1.5, y: 4.2, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 3 (3 pax)" },
+        { id: "elem-tbl-4", type: "rect_table", x: 6.0, y: 4.2, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 4 (3 pax)" },
+        { id: "elem-tbl-5", type: "rect_table", x: 1.5, y: 5.9, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 5 (3 pax)" },
+        { id: "elem-tbl-6", type: "rect_table", x: 6.0, y: 5.9, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 6 (3 pax)" },
+        { id: "elem-tbl-7", type: "rect_table", x: 1.5, y: 7.6, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 7 (3 pax)" },
+        { id: "elem-tbl-8", type: "rect_table", x: 6.0, y: 7.6, width: 2.4, length: 0.9, rotation: 0, tableDimensionsInches: "30x96", seats: 3, label: "Table 8 (3 pax)" },
+      ],
+    },
+    {
+      id: "preset-life-group-circle",
+      name: "Life Group Circle",
+      description: "60-inch round banquet tables arranged for intimate discipleship and discussion.",
+      category: "fellowship",
+      defaultCapacity: 32,
+      elements: [
+        { id: "elem-rnd-1", type: "round_table", x: 2.0, y: 1.5, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 1 (8 seats)" },
+        { id: "elem-rnd-2", type: "round_table", x: 6.0, y: 1.5, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 2 (8 seats)" },
+        { id: "elem-rnd-3", type: "round_table", x: 2.0, y: 4.8, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 3 (8 seats)" },
+        { id: "elem-rnd-4", type: "round_table", x: 6.0, y: 4.8, width: 2.4, length: 2.4, rotation: 0, tableDiameterInches: 60, seats: 8, label: "Circle 4 (8 seats)" },
+      ],
+    },
+    {
+      id: "preset-prayer-worship-open",
+      name: "Prayer & Worship Night (Open Front)",
+      description: "Front open ministry space for altar prayer, flanked by outer seating blocks.",
+      category: "prayer",
+      defaultCapacity: 30,
+      elements: [
+        { id: "elem-stage-pwn", type: "stage", x: 3.0, y: 0.5, width: 4.0, length: 1.5, rotation: 0, label: "Worship Team Platform" },
+        { id: "elem-aisle-open", type: "aisle", x: 2.5, y: 2.5, width: 5.0, length: 2.5, rotation: 0, label: "Open Prayer & Altar Area" },
+        { id: "elem-rows-pwn-l", type: "chair_row", x: 0.5, y: 5.5, width: 3.5, length: 3.0, rotation: 0, chairsPerRow: 5, rowCount: 3, seats: 15, label: "Left Seating (15 seats)" },
+        { id: "elem-rows-pwn-r", type: "chair_row", x: 6.0, y: 5.5, width: 3.5, length: 3.0, rotation: 0, chairsPerRow: 5, rowCount: 3, seats: 15, label: "Right Seating (15 seats)" },
+        { id: "elem-booth-pwn", type: "sound_booth", x: 4.0, y: 7.5, width: 2.0, length: 1.2, rotation: 0, label: "Audio Console" },
+      ],
+    },
+  ];
+
+  const layouts = new Map<string, RoomLayout>();
+  // Pre-seed Room A layout with Sunday Worship
+  layouts.set(rooms[0].id, {
+    id: `layout-${rooms[0].id}`,
+    roomId: rooms[0].id,
+    name: "Room A - Default Worship Layout",
+    elements: presets[0].elements,
+    gridSnapMeters: 0.5,
+    totalSeats: 48,
+    updatedAt: nowIso,
+  });
+
+  const kioskDisplays: KioskDisplay[] = [
+    {
+      id: "kiosk-display-room-a",
+      token: "kiosk_door_room_a_seed",
+      displayType: "door_sign",
+      roomId: rooms[0].id,
+      label: "Room A - Main East Door Tablet",
+      isActive: true,
+      lastSeenAt: nowIso,
+      createdAt: nowIso,
+    },
+    {
+      id: "kiosk-display-room-b",
+      token: "kiosk_door_room_b_seed",
+      displayType: "door_sign",
+      roomId: rooms[1].id,
+      label: "Room B - Youth Wing Door Tablet",
+      isActive: true,
+      lastSeenAt: nowIso,
+      createdAt: nowIso,
+    },
+    {
+      id: "kiosk-display-lobby-hub",
+      token: "kiosk_lobby_hub_seed",
+      displayType: "lobby_hub",
+      roomId: null,
+      label: "Ground Floor Lobby TV Display",
+      isActive: true,
+      lastSeenAt: nowIso,
+      createdAt: nowIso,
+    },
+  ];
+
   return {
     users,
     accessEvents: [],
@@ -211,6 +333,9 @@ export function createDemoSeed(): DemoState {
     bookings,
     reschedules: [],
     announcements,
+    layouts,
+    presets,
+    kioskDisplays,
     files: new Map(),
     appointments: new Map(),
     ghlContacts: new Map(),

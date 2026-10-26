@@ -41,7 +41,11 @@ export default async function AdminAnnouncementsPage({ searchParams }: PageProps
 
   return (
     <div>
-      <PageHeader variant="operational" title="Announcements" description="Posters appear in the member bulletin between their publish and expiry dates. The newest live poster is featured." />
+      <PageHeader
+        variant="operational"
+        title="Church Bulletin & Announcements"
+        description="Manage notices, posters, and events shown on the Lobby TV Wall Hub display (/display/hub) and member dashboard. Active notices rotate automatically on the lobby screens."
+      />
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section aria-labelledby="list-heading" className="min-w-0">

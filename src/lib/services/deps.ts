@@ -32,6 +32,12 @@ export async function getAnnouncementDeps(): Promise<AnnouncementDeps> {
   return { repo, storage };
 }
 
+export type RoomDeps = AnnouncementDeps;
+
+export async function getRoomDeps(): Promise<RoomDeps> {
+  return getAnnouncementDeps();
+}
+
 /** Internal "pending review" GHL alerts, sent after the response so requests never wait for GHL. */
 export function getReviewAlerts(calendar: CalendarGateway): ReviewAlerts {
   return createReviewAlerts({

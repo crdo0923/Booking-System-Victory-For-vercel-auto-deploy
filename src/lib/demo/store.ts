@@ -1,6 +1,6 @@
 import "server-only";
 import type { TimeRange } from "@/lib/domain/availability";
-import type { AccessChange, AccessStatus, Announcement, Booking, RescheduleRequest, Role, RoleChange, Room } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, Booking, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomLayout } from "@/lib/data/types";
 import { isProduction } from "@/lib/env";
 import { createDemoSeed } from "@/lib/demo/seed";
 
@@ -39,6 +39,9 @@ export interface DemoState {
   bookings: Booking[];
   reschedules: RescheduleRequest[];
   announcements: Announcement[];
+  layouts: Map<string, RoomLayout>;
+  presets: LayoutPreset[];
+  kioskDisplays: KioskDisplay[];
   files: Map<string, { bytes: Uint8Array; contentType: string }>;
   /** Simulated GHL appointments, keyed by appointment id. */
   appointments: Map<string, { calendarId: string; range: TimeRange; title: string; assignedUserId: string; status: string }>;
@@ -57,9 +60,13 @@ const globalForDemo = globalThis as typeof globalThis & { __victoryDemoState?: D
  * globalThis so it survives hot reloads and is shared across route bundles.
  */
 export function getDemoState(): DemoState {
-  if (isProduction()) {
+  if (isProduction() && Boolean(process.env.DATABASE_URL?.trim()) && process.env.DEMO_MODE !== "true") {
     throw new Error("Demo data is not available in production.");
   }
   globalForDemo.__victoryDemoState ??= createDemoSeed();
-  return globalForDemo.__victoryDemoState;
+  const state = globalForDemo.__victoryDemoState;
+  state.layouts ??= createDemoSeed().layouts;
+  state.presets ??= createDemoSeed().presets;
+  state.kioskDisplays ??= createDemoSeed().kioskDisplays;
+  return state;
 }

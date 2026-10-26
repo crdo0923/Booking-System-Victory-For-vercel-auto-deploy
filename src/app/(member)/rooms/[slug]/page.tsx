@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { DAY_END_HOUR, DAY_START_HOUR, MAX_BOOKING_MINUTES, SLOT_MINUTES } from "@/lib/config";
 import { requireUser } from "@/lib/auth/session";
 import { imageUrl } from "@/lib/data";
-import { getActiveRooms, getRepositoryForRequest } from "@/lib/data/queries";
+import { getActiveRooms, getRepositoryForRequest, getRoomLayout } from "@/lib/data/queries";
 import type { Room } from "@/lib/data/types";
 import { buildDaySlots } from "@/lib/domain/availability";
 import { formatDateKey } from "@/lib/domain/time";
@@ -48,6 +48,7 @@ export default async function RoomPage({ params, searchParams }: PageProps<"/roo
   const user = await requireUser();
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const [room, rooms] = await Promise.all([loadRoom(slug), getActiveRooms()]);
+  const layout = await getRoomLayout(room.id);
 
   const { first, last } = bookableDateRange(new Date());
   const requested = parseDateKey(firstParam(query.date));
@@ -90,7 +91,16 @@ export default async function RoomPage({ params, searchParams }: PageProps<"/roo
           </div>
 
           <div className="lg:col-span-7">
-            <RoomVisual roomName={room.name} roomId={room.id} photoUrl={imageUrl(room.imagePath)} mapRooms={mapRooms} locationLabel={room.locationLabel} />
+            <RoomVisual
+              roomName={room.name}
+              roomId={room.id}
+              photoUrl={imageUrl(room.imagePath)}
+              mapRooms={mapRooms}
+              locationLabel={room.locationLabel}
+              roomDimensionsLM={room.dimensionsLM}
+              roomDimensionsWM={room.dimensionsWM}
+              layout={layout}
+            />
           </div>
         </div>
       </div>
