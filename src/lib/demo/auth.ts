@@ -2,12 +2,12 @@ import "server-only";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import type { AuthProvider } from "@/lib/auth/provider";
-import { getDemoState } from "@/lib/demo/store";
+import { getDemoSessionSecret, getDemoState } from "@/lib/demo/store";
 import { hashDemoPassword, verifyDemoPassword } from "@/lib/demo/passwords";
 import { DEMO_SESSION_COOKIE } from "@/lib/auth/constants";
 
 function sign(userId: string): string {
-  const mac = createHmac("sha256", getDemoState().sessionSecret).update(userId).digest("base64url");
+  const mac = createHmac("sha256", getDemoSessionSecret()).update(userId).digest("base64url");
   return `${userId}.${mac}`;
 }
 

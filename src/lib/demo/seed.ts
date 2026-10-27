@@ -1,9 +1,8 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
 import type { Announcement, Booking, KioskDisplay, LayoutPreset, Room, RoomLayout } from "@/lib/data/types";
 import { addDaysToKey, dateKeyInZone, zonedDateTime } from "@/lib/domain/time";
 import { hashDemoPassword } from "@/lib/demo/passwords";
-import type { DemoState, DemoUser } from "@/lib/demo/store";
+import { getDemoSessionSecret, type DemoState, type DemoUser } from "@/lib/demo/store";
 
 export const DEMO_PASSWORD = "victory-demo";
 
@@ -342,6 +341,6 @@ export function createDemoSeed(): DemoState {
     // The seeded member has already connected Google Calendar; new accounts have not.
     googleConnections: new Set([ids.member]),
     googleEvents: new Map(),
-    sessionSecret: randomBytes(32),
+    sessionSecret: getDemoSessionSecret(),
   };
 }

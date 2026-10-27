@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import type { TimeRange } from "@/lib/domain/availability";
 import type { AccessChange, AccessStatus, Announcement, Booking, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomLayout } from "@/lib/data/types";
 import { isProduction } from "@/lib/env";
@@ -55,6 +56,15 @@ export interface DemoState {
 
 const globalForDemo = globalThis as typeof globalThis & { __victoryDemoState?: DemoState };
 
+export function getDemoSessionSecret(): Buffer {
+  const configured = process.env.DEMO_SESSION_SECRET?.trim();
+  if (configured) {
+    return Buffer.from(configured, "utf-8");
+  }
+  // Stable secret across serverless lambdas / reloads derived from an environment salt
+  return createHash("sha256").update("victory-rooms-demo-session-secret-v1").digest();
+}
+
 /**
  * In-memory state for local development without credentials. Kept on
  * globalThis so it survives hot reloads and is shared across route bundles.
@@ -68,5 +78,6 @@ export function getDemoState(): DemoState {
   state.layouts ??= createDemoSeed().layouts;
   state.presets ??= createDemoSeed().presets;
   state.kioskDisplays ??= createDemoSeed().kioskDisplays;
+  state.sessionSecret ??= getDemoSessionSecret();
   return state;
 }
