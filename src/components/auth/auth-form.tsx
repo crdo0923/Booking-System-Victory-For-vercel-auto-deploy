@@ -34,10 +34,10 @@ function ModeForm({ mode, next, onModeChange }: { mode: Mode; next: string; onMo
 
   return (
     <div>
-      <h1 className="headline text-[2.6rem]">{text.title}</h1>
-      <p className="mt-3 text-[15px] text-muted">{text.lede}</p>
+      <h1 className="headline text-2xl sm:text-3xl">{text.title}</h1>
+      <p className="mt-1.5 text-sm text-muted">{text.lede}</p>
 
-      <form action={formAction} className="mt-8 space-y-4" noValidate>
+      <form action={formAction} className="mt-4 space-y-3" noValidate>
         <input type="hidden" name="next" value={next} />
         {state.error && <Notice tone="error">{state.error}</Notice>}
         {state.message && <Notice tone="success">{state.message}</Notice>}
@@ -93,12 +93,12 @@ function ModeForm({ mode, next, onModeChange }: { mode: Mode; next: string; onMo
           </Field>
         )}
 
-        <SubmitButton className="w-full" size="lg" pending={pending} pendingLabel={text.pending}>
+        <SubmitButton className="w-full" size="md" pending={pending} pendingLabel={text.pending}>
           {text.submit}
         </SubmitButton>
       </form>
 
-      <div className="mt-8 space-y-2 border-t border-line pt-6 text-sm text-muted">
+      <div className="mt-4 space-y-1.5 border-t border-line pt-3.5 text-xs text-muted">
         {mode === "signin" ? (
           <>
             <p>

@@ -6,13 +6,14 @@ import { APP_NAME } from "@/lib/config";
 import { AccountLink } from "@/components/shell/account-link";
 import { BrandMark } from "@/components/shell/brand-mark";
 import { DemoBanner } from "@/components/shell/demo-banner";
+import { SignOutButton } from "@/components/shell/sign-out-button";
 import { TabBar, TopNav, type NavItem } from "@/components/shell/nav-links";
 
 const memberNav: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/rooms", label: "Book a Room", icon: "book", matchPrefix: true },
   { href: "/bookings", label: "My Bookings", icon: "bookings" },
-  { href: "/shuttles", label: "Shuttle", icon: "bookings" },
+  { href: "/shuttles", label: "Shuttle", icon: "shuttles" },
 ];
 
 export function SkipLink() {
@@ -45,6 +46,7 @@ export function MemberShell({ user, children }: { user: SessionUser; children: R
               </Link>
             )}
             <AccountLink fullName={user.fullName} />
+            <SignOutButton variant="icon" />
           </div>
         </div>
       </header>

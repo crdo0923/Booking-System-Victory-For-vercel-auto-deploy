@@ -81,7 +81,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       {/* 1-Tap Sign-In Buttons */}
       <QuickSignInSelector accounts={quickAccounts} next={next} />
 
-      <div className="relative my-8 text-center">
+      <div className="relative my-4 text-center">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-line" />
         </div>

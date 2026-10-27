@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, useTransition } from "react";
+import { Fragment, useId, useMemo, useState, useTransition } from "react";
 import {
   Check,
   ChevronDown,
@@ -178,10 +178,12 @@ export function SecurityAuditManager({
               </thead>
               <tbody className="divide-y divide-line">
                 {(Object.keys(groupedDefinitions) as SecurityModule[]).map((mod) => (
-                  <tr key={mod} className="contents">
-                    <td colSpan={roleRows.length + 1} className="bg-sunken/40 py-2.5 px-4 font-semibold text-ink border-y border-line text-xs tracking-wider uppercase">
-                      {moduleTitles[mod] || mod}
-                    </td>
+                  <Fragment key={mod}>
+                    <tr>
+                      <td colSpan={roleRows.length + 1} className="bg-sunken/40 py-2.5 px-4 font-semibold text-ink border-y border-line text-xs tracking-wider uppercase">
+                        {moduleTitles[mod] || mod}
+                      </td>
+                    </tr>
                     {groupedDefinitions[mod]?.map((def) => (
                       <tr key={def.capability} className="hover:bg-sunken/20 transition-colors">
                         <td className="py-3 px-4 align-top">
@@ -209,7 +211,7 @@ export function SecurityAuditManager({
                         })}
                       </tr>
                     ))}
-                  </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

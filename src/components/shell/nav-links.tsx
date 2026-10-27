@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarPlus, DoorClosed, Home, LayoutGrid, ListChecks, Megaphone, Monitor, Package, Shield, ShieldCheck, Users, type LucideIcon } from "lucide-react";
+import { Bus, CalendarPlus, DoorClosed, Home, LayoutGrid, ListChecks, Megaphone, Monitor, Package, Shield, ShieldCheck, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface NavItem {
   href: string;
   label: string;
-  icon: "home" | "book" | "bookings" | "overview" | "requests" | "rooms" | "users" | "announcements" | "displays" | "inventory" | "assets" | "security";
+  icon: "home" | "book" | "bookings" | "overview" | "requests" | "rooms" | "users" | "announcements" | "displays" | "inventory" | "assets" | "security" | "shuttles";
   /** Match nested routes too (e.g. /rooms/room-a). */
   matchPrefix?: boolean;
   count?: number;
@@ -27,6 +27,7 @@ const icons: Record<NavItem["icon"], LucideIcon> = {
   inventory: Package,
   assets: ShieldCheck,
   security: Shield,
+  shuttles: Bus,
 };
 
 function isActive(pathname: string, item: NavItem) {

@@ -10,6 +10,7 @@ import { SkipLink } from "@/components/shell/member-shell";
 import { ScrollNav, SideNav, type NavItem } from "@/components/shell/nav-links";
 
 import { hasPermission } from "@/lib/domain/security-matrix";
+import { SignOutButton } from "@/components/shell/sign-out-button";
 
 interface AdminShellProps {
   user: SessionUser;
@@ -30,7 +31,7 @@ export function AdminShell({ user, pendingBookings, pendingUsers, children }: Ad
     { href: "/admin/inventory", label: "Inventory", icon: "inventory", matchPrefix: true, capability: "inventory:view" },
     { href: "/admin/users", label: "Users", icon: "users", matchPrefix: true, count: pendingUsers, capability: "users:view" },
     { href: "/admin/announcements", label: "Announcements", icon: "announcements", matchPrefix: true, capability: "rooms:manage" },
-    { href: "/admin/shuttles", label: "Shuttles", icon: "requests", matchPrefix: true },
+    { href: "/admin/shuttles", label: "Shuttles", icon: "shuttles", matchPrefix: true },
     { href: "/admin/displays", label: "Displays", icon: "displays", matchPrefix: true, capability: "displays:view" },
     { href: "/admin/security", label: "Security & Audit", icon: "security", matchPrefix: true, capability: "audit:view" },
   ];
@@ -56,13 +57,16 @@ export function AdminShell({ user, pendingBookings, pendingUsers, children }: Ad
               <ArrowLeft className="size-4" aria-hidden />
               Member view
             </Link>
-            <Link href="/account" className="flex items-center gap-2.5 rounded-md px-2 py-2 transition-colors hover:bg-surface/70">
-              <Avatar name={user.fullName} size="sm" />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold">{user.fullName}</span>
-                <span className="block truncate text-xs text-muted">{user.email}</span>
-              </span>
-            </Link>
+            <div className="flex items-center justify-between gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-surface/70">
+              <Link href="/account" className="flex min-w-0 items-center gap-2.5 py-0.5 flex-1">
+                <Avatar name={user.fullName} size="sm" />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold">{user.fullName}</span>
+                  <span className="block truncate text-xs text-muted">{user.email}</span>
+                </span>
+              </Link>
+              <SignOutButton variant="icon" className="shrink-0" />
+            </div>
           </div>
         </aside>
 
@@ -70,7 +74,10 @@ export function AdminShell({ user, pendingBookings, pendingUsers, children }: Ad
           <header className="sticky top-0 z-30 border-b border-line bg-canvas/90 backdrop-blur-md lg:hidden">
             <div className="flex h-14 items-center justify-between px-4 sm:px-6">
               <BrandMark href="/admin" label={APP_NAME} sublabel="Church office" />
-              <AccountLink fullName={user.fullName} compact />
+              <div className="flex items-center gap-1">
+                <AccountLink fullName={user.fullName} compact />
+                <SignOutButton variant="icon" />
+              </div>
             </div>
             <ScrollNav items={[...nav, { href: "/dashboard", label: "Member view", icon: "home" }]} />
           </header>

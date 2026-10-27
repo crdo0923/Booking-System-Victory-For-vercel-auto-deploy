@@ -54,7 +54,32 @@ export function createDemoAuthProvider(): AuthProvider {
     },
 
     async signIn(email, password) {
-      const user = state.users.find((u) => u.email === email);
+      let user = state.users.find((u) => u.email === email);
+      if (!user) {
+        // Auto-provision demo account if matching known DEMO_ACCOUNTS
+        const { DEMO_ACCOUNTS, DEMO_PASSWORD } = await import("@/lib/demo/seed");
+        const account = Object.values(DEMO_ACCOUNTS).find((acc) => acc.email === email);
+        if (account) {
+          const nowIso = new Date().toISOString();
+          const newUser: typeof state.users[number] = {
+            id: randomUUID(),
+            email: account.email,
+            fullName: account.fullName,
+            phone: "+639170000099",
+            role: account.role as "admin" | "user",
+            systemRole: account.systemRole,
+            accessStatus: account.systemRole === "guest" ? "pending" : "active",
+            accessReason: null,
+            accessReviewedAt: account.systemRole === "guest" ? null : nowIso,
+            accessNotificationError: null,
+            ghlContactId: null,
+            passwordHash: hashDemoPassword(DEMO_PASSWORD),
+            createdAt: nowIso,
+          };
+          state.users.push(newUser);
+          user = newUser;
+        }
+      }
       if (!user || !verifyDemoPassword(password, user.passwordHash)) {
         return { ok: false, error: "Incorrect email or password." };
       }
