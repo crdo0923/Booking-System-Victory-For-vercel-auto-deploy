@@ -9,7 +9,7 @@ import { GhlError, ghlUserMessage } from "@/lib/ghl/errors";
 import { REVIEW_ALERT_TAGS, resolveCalendarId, type BookingFieldValues, type CalendarGateway } from "@/lib/ghl/gateway";
 import type { GoogleCalendarGateway } from "@/lib/google/gateway";
 import { getRoomDayAvailability, isWindowFreeInCalendar } from "@/lib/services/availability";
-import { SYNC_MESSAGES, syncApprovedBooking, type CalendarSyncOutcome } from "@/lib/services/calendar-sync";
+import { SYNC_MESSAGES, syncApprovedBooking, syncRescheduledBooking, type CalendarSyncOutcome } from "@/lib/services/calendar-sync";
 import { syncGhlContact } from "@/lib/services/ghl-contact";
 import { failure, fieldErrorsFrom, success, type ServiceResult } from "@/lib/services/result";
 import { clearReviewAlert, queueReviewAlert, type ReviewAlerts } from "@/lib/services/review-alerts";
@@ -27,8 +27,89 @@ export interface BookingServiceDeps {
   reviewAlerts?: ReviewAlerts;
 }
 
+const adminEditSchema = bookingRequestSchema.extend({ bookingId: bookingIdSchema.shape.bookingId });
+
+export type AdminEditResult = { bookingId: string; calendarSync: CalendarSyncOutcome };
+
 /** A concurrent request took the time between the availability check and the insert. */
 export const BOOKING_RACE_MESSAGE = "Someone just booked that time. Please pick another slot.";
+
+export async function editApprovedBooking(rawInput: unknown, actor: SessionUser | null, deps: BookingServiceDeps): Promise<ServiceResult<AdminEditResult>> {
+  const denied = guard(actor);
+  if (denied) return denied;
+  if (actor!.role !== "admin") return failure("forbidden", "Only admins can edit approved bookings.");
+  const parsed = adminEditSchema.safeParse(rawInput);
+  if (!parsed.success) return failure("invalid", "Please check the highlighted fields.", fieldErrorsFrom(parsed.error.issues));
+  const input = parsed.data;
+  const booking = await deps.repo.getBookingDetails(input.bookingId);
+  if (!booking || booking.status !== "approved") return failure("not_found", "Only approved bookings can be edited.");
+  const room = await deps.repo.getRoomById(input.roomId);
+  if (!room || !room.isActive) return failure("not_found", "That room is not available.");
+  if (input.attendeeCount > room.capacity) return failure("invalid", "Attendee count exceeds room capacity.", { attendeeCount: `${room.name} holds up to ${room.capacity} people.` });
+
+  const start = zonedDateTime(input.date, input.startTime);
+  const end = zonedDateTime(input.date, input.endTime);
+  const windowProblem = validateBookingWindow({ start, end, now: deps.now() });
+  if (windowProblem) return failure("invalid", windowProblem);
+  const unchangedWindow = booking.roomId === room.id && booking.startTime === start.toISOString() && booking.endTime === end.toISOString();
+  if (!unchangedWindow) {
+    const availability = await getRoomDayAvailability(room, input.date, deps);
+    if (availability.problem) return failure("calendar_error", availability.problemMessage ?? "This room can't be booked right now.");
+    if (!isRangeBookable(availability.slots, toRange(start, end))) return failure("conflict", BOOKING_RACE_MESSAGE);
+  }
+
+  const calendarId = resolveCalendarId(deps.calendar, room);
+  let assignedUserId: string | null = null;
+  if (calendarId) assignedUserId = (await deps.calendar.getCalendarInfo(calendarId)).assignedUserId;
+  if (booking.ghlAppointmentId && (!calendarId || !assignedUserId)) return failure("calendar_error", "This room calendar is not ready for an approved booking.");
+
+  try {
+    if (booking.ghlAppointmentId) {
+      await deps.calendar.moveAppointment(booking.ghlAppointmentId, {
+        calendarId: calendarId!,
+        assignedUserId: assignedUserId!,
+        start,
+        end,
+        title: input.eventName,
+      });
+    }
+    const updated = await deps.repo.adminEditApprovedBooking({
+      bookingId: booking.id,
+      roomId: room.id,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      eventName: input.eventName,
+      eventType: input.eventType,
+      attendeeCount: input.attendeeCount,
+      purpose: input.purpose,
+    });
+    if (!updated) throw new RepositoryError("conflict", "The booking changed before it could be saved.");
+    const current = await deps.repo.getBookingDetails(updated.id);
+    if (!current) throw new Error("Updated booking could not be loaded.");
+    const calendarSync = await syncRescheduledBooking(current, { repo: deps.repo, google: deps.google });
+    return success({ bookingId: updated.id, calendarSync }, calendarSync === "failed" ? "Booking updated, but Google Calendar sync failed." : "Approved booking updated.");
+  } catch (error) {
+    if (booking.ghlAppointmentId) {
+      try {
+        const oldRoom = await deps.repo.getRoomById(booking.roomId);
+        const oldCalendarId = oldRoom ? resolveCalendarId(deps.calendar, oldRoom) : null;
+        const oldAssignedUserId = oldCalendarId ? (await deps.calendar.getCalendarInfo(oldCalendarId)).assignedUserId : null;
+        if (oldCalendarId && oldAssignedUserId) {
+          await deps.calendar.moveAppointment(booking.ghlAppointmentId, {
+            calendarId: oldCalendarId,
+            assignedUserId: oldAssignedUserId,
+            start: new Date(booking.startTime),
+            end: new Date(booking.endTime),
+            title: booking.eventName,
+          });
+        }
+      } catch (rollbackError) {
+        console.error("[bookings] failed to roll back GHL edit", rollbackError instanceof Error ? rollbackError.message : rollbackError);
+      }
+    }
+    return repositoryFailure(error);
+  }
+}
 
 const ALREADY_REVIEWED: Record<string, string> = {
   approved: "This request was already approved.",

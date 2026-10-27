@@ -464,6 +464,7 @@ export function createDemoSeed(): DemoState {
     rooms,
     bookings,
     reschedules: [],
+    shuttles: [],
     announcements,
     layouts,
     presets,

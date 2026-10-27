@@ -22,6 +22,8 @@ import type {
   UpdateRoomInput,
   RoomLayout,
   UserSummary,
+  ShuttleRequest,
+  ShuttleRequestDetails,
   InventoryCategory,
   InventoryItem,
   CreateInventoryItemInput,
@@ -73,6 +75,26 @@ export interface Repository {
   updateRoom(id: string, input: UpdateRoomInput): Promise<Room>;
   archiveRoom(id: string, archived: boolean): Promise<Room>;
 
+  /** Admin-only: saves the room's visual seating and furniture layout. */
+  getRoomLayout(roomId: string): Promise<RoomLayout | null>;
+  saveRoomLayout(roomId: string, layout: Omit<RoomLayout, "id" | "updatedAt">): Promise<RoomLayout>;
+  /** Admin-only: saves a reusable room layout preset. */
+  listLayoutPresets(): Promise<LayoutPreset[]>;
+  saveLayoutAsPreset(preset: Omit<LayoutPreset, "id">): Promise<LayoutPreset>;
+
+  /** Admin-only: manages kiosk displays and private display tokens. */
+  listKioskDisplays(): Promise<KioskDisplay[]>;
+  getKioskDisplayByToken(token: string): Promise<KioskDisplay | null>;
+  createKioskDisplay(input: CreateKioskDisplayInput): Promise<KioskDisplay>;
+  revokeKioskDisplay(id: string): Promise<boolean>;
+  touchKioskDisplay(token: string): Promise<void>;
+
+  listInventoryItems(includeArchived?: boolean): Promise<InventoryItem[]>;
+  getInventoryItem(id: string): Promise<InventoryItem | null>;
+  createInventoryItem(input: CreateInventoryItemInput): Promise<InventoryItem>;
+  updateInventoryItem(id: string, input: UpdateInventoryItemInput): Promise<InventoryItem | null>;
+  archiveInventoryItem(id: string): Promise<boolean>;
+
   /**
    * Periods a room is taken, without requester details: pending and approved
    * bookings plus slots held by pending reschedule requests. `excludeRescheduleId`
@@ -102,6 +124,16 @@ export interface Repository {
   cancelOwnBooking(id: string, userId: string): Promise<Booking | null>;
   /** Admin cancels an approved booking (after GHL was cancelled). */
   cancelApprovedBooking(id: string): Promise<Booking | null>;
+  adminEditApprovedBooking(input: {
+    bookingId: string;
+    roomId: string;
+    startTime: string;
+    endTime: string;
+    eventName: string;
+    eventType: string;
+    attendeeCount: number;
+    purpose: string;
+  }): Promise<Booking | null>;
   setCalendarSync(bookingId: string, eventId: string | null, error: string | null): Promise<void>;
   /** Admin-only: records whether the GHL email for the decision was sent (null = sent). */
   setBookingNotificationResult(bookingId: string, error: string | null): Promise<void>;
@@ -125,6 +157,26 @@ export interface Repository {
   cancelOwnReschedule(id: string): Promise<RescheduleRequest | null>;
   setRescheduleNotificationResult(id: string, error: string | null): Promise<void>;
 
+  createShuttleRequest(
+    input: Omit<
+      ShuttleRequest,
+      "id" | "status" | "denialReason" | "finalGas" | "finalToll" | "finalOther" | "driverId" | "reviewedBy" | "reviewedAt" | "createdAt"
+    >,
+  ): Promise<ShuttleRequest>;
+  listShuttleRequestsForUser(userId: string): Promise<ShuttleRequest[]>;
+  listShuttleRequests(status?: ShuttleRequest["status"]): Promise<ShuttleRequestDetails[]>;
+  reviewShuttleRequest(input: {
+    id: string;
+    status: "approved" | "denied";
+    denialReason?: string | null;
+    driverId?: string | null;
+    finalGas?: number | null;
+    finalToll?: number | null;
+    finalOther?: number | null;
+  }): Promise<ShuttleRequest | null>;
+  listShuttleDrivers(): Promise<Pick<Profile, "id" | "fullName">[]>;
+  getShuttleCostSummary(): Promise<{ estimated: number; final: number; approvedCount: number }>;
+
   listLiveAnnouncements(): Promise<Announcement[]>;
   listAllAnnouncements(): Promise<Announcement[]>;
   getAnnouncement(id: string): Promise<Announcement | null>;
@@ -133,26 +185,6 @@ export interface Repository {
   createAnnouncement(input: AnnouncementInput, createdBy: string): Promise<Announcement>;
   updateAnnouncement(id: string, input: Partial<AnnouncementInput>): Promise<Announcement | null>;
   deleteAnnouncement(id: string): Promise<Announcement | null>;
-
-  // Spandi Room Layout methods
-  getRoomLayout(roomId: string): Promise<RoomLayout | null>;
-  saveRoomLayout(roomId: string, layout: Omit<RoomLayout, "id" | "updatedAt">): Promise<RoomLayout>;
-  listLayoutPresets(): Promise<LayoutPreset[]>;
-  saveLayoutAsPreset(preset: Omit<LayoutPreset, "id">): Promise<LayoutPreset>;
-
-  // Tablet / TV Wall Kiosk Display methods
-  listKioskDisplays(): Promise<KioskDisplay[]>;
-  getKioskDisplayByToken(token: string): Promise<KioskDisplay | null>;
-  createKioskDisplay(input: CreateKioskDisplayInput): Promise<KioskDisplay>;
-  revokeKioskDisplay(id: string): Promise<boolean>;
-  touchKioskDisplay(token: string): Promise<void>;
-
-  // Inventory Consumables Catalog methods
-  listInventoryItems(includeArchived?: boolean): Promise<InventoryItem[]>;
-  getInventoryItem(id: string): Promise<InventoryItem | null>;
-  createInventoryItem(input: CreateInventoryItemInput): Promise<InventoryItem>;
-  updateInventoryItem(id: string, input: UpdateInventoryItemInput): Promise<InventoryItem | null>;
-  archiveInventoryItem(id: string): Promise<boolean>;
 }
 
 /** Private object storage. Keys use the prefixes announcements/, rooms/ and maps/. */

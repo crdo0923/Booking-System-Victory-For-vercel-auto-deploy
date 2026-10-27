@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { TimeRange } from "@/lib/domain/availability";
-import type { AccessChange, AccessStatus, Announcement, Booking, InventoryItem, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomLayout } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, Booking, InventoryItem, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, ShuttleRequest, RoomLayout } from "@/lib/data/types";
 import { isProduction } from "@/lib/env";
 import { createDemoSeed } from "@/lib/demo/seed";
 
@@ -39,6 +39,7 @@ export interface DemoState {
   rooms: Room[];
   bookings: Booking[];
   reschedules: RescheduleRequest[];
+  shuttles: ShuttleRequest[];
   announcements: Announcement[];
   layouts: Map<string, RoomLayout>;
   presets: LayoutPreset[];
@@ -75,11 +76,5 @@ export function getDemoState(): DemoState {
     throw new Error("Demo data is not available in production.");
   }
   globalForDemo.__victoryDemoState ??= createDemoSeed();
-  const state = globalForDemo.__victoryDemoState;
-  state.layouts ??= createDemoSeed().layouts;
-  state.presets ??= createDemoSeed().presets;
-  state.kioskDisplays ??= createDemoSeed().kioskDisplays;
-  state.inventoryItems ??= createDemoSeed().inventoryItems;
-  state.sessionSecret ??= getDemoSessionSecret();
-  return state;
+  return globalForDemo.__victoryDemoState;
 }

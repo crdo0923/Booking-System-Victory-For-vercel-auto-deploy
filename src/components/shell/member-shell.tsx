@@ -12,6 +12,7 @@ const memberNav: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/rooms", label: "Book a Room", icon: "book", matchPrefix: true },
   { href: "/bookings", label: "My Bookings", icon: "bookings" },
+  { href: "/shuttles", label: "Shuttle", icon: "bookings" },
 ];
 
 export function SkipLink() {

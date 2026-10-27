@@ -222,6 +222,36 @@ export interface AnnouncementInput {
   isPublished: boolean;
 }
 
+export type ShuttleStatus = "pending" | "approved" | "denied";
+export interface ShuttleRequest {
+  id: string;
+  userId: string;
+  dates: string[];
+  origin: string;
+  destination: string;
+  departureTime: string;
+  arrivalTime: string | null;
+  passengerCount: number;
+  purpose: string;
+  estimatedGas: number;
+  estimatedToll: number;
+  estimatedOther: number;
+  finalGas: number | null;
+  finalToll: number | null;
+  finalOther: number | null;
+  status: ShuttleStatus;
+  denialReason: string | null;
+  driverId: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+export interface ShuttleRequestDetails extends ShuttleRequest {
+  requester: Pick<Profile, "id" | "fullName" | "email" | "phone">;
+  driver: Pick<Profile, "id" | "fullName"> | null;
+  reviewer: Pick<Profile, "id" | "fullName"> | null;
+}
+
 export type LayoutElementType =
   | "stage"
   | "podium"

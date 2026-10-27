@@ -81,6 +81,19 @@ const ANNOUNCEMENT_COLUMNS: Record<keyof AnnouncementInput, string> = {
 const ACCESS_STATUSES: AccessStatus[] = ["pending", "active", "denied", "revoked"];
 const BOOKING_STATUSES: BookingStatus[] = ["pending", "approved", "denied", "cancelled"];
 const RESCHEDULE_STATUSES: RescheduleStatus[] = ["pending", "approved", "denied", "cancelled"];
+function mapShuttle(r: any) {
+  return { id:r.id, userId:r.user_id, dates:(r.dates ?? []).map((d:string|Date)=>String(d).slice(0,10)), origin:r.origin, destination:r.destination,
+    departureTime:String(r.departure_time).slice(0,5), arrivalTime:r.arrival_time ? String(r.arrival_time).slice(0,5) : null,
+    passengerCount:Number(r.passenger_count), purpose:r.purpose, estimatedGas:Number(r.estimated_gas), estimatedToll:Number(r.estimated_toll),
+    estimatedOther:Number(r.estimated_other), finalGas:r.final_gas == null ? null : Number(r.final_gas), finalToll:r.final_toll == null ? null : Number(r.final_toll),
+    finalOther:r.final_other == null ? null : Number(r.final_other), status:r.status, denialReason:r.denial_reason, driverId:r.driver_id,
+    reviewedBy:r.reviewed_by, reviewedAt:r.reviewed_at ? new Date(r.reviewed_at).toISOString() : null, createdAt:new Date(r.created_at).toISOString() };
+}
+function mapShuttleDetails(r:any) {
+  return { ...mapShuttle(r), requester:{ id:r.user_id, fullName:r.requester_name, email:r.requester_email, phone:r.requester_phone },
+    driver:r.driver_id ? { id:r.driver_id, fullName:r.driver_name } : null,
+    reviewer:r.reviewed_by ? { id:r.reviewed_by, fullName:r.reviewer_name } : null };
+}
 
 /**
  * Repository backed by Neon Postgres. Every call runs as `app_member` for the
@@ -430,6 +443,15 @@ export function createPostgresRepository(actorId: string | null): Repository {
       return row ? toBooking(row) : null;
     },
 
+    async adminEditApprovedBooking(input) {
+      const row = await first<BookingRow>(
+        "adminEditApprovedBooking",
+        "select * from public.admin_edit_approved_booking($1, $2, $3, $4, $5, $6, $7, $8)",
+        [input.bookingId, input.roomId, input.startTime, input.endTime, input.eventName, input.eventType, input.attendeeCount, input.purpose],
+      );
+      return row ? toBooking(row) : null;
+    },
+
     async setCalendarSync(bookingId, eventId, error) {
       await query("setCalendarSync", "select public.set_booking_calendar_sync($1, $2, $3)", [bookingId, eventId, error]);
     },
@@ -606,6 +628,41 @@ export function createPostgresRepository(actorId: string | null): Repository {
     async deleteAnnouncement(id) {
       const row = await first<AnnouncementRow>("deleteAnnouncement", "delete from public.announcements where id = $1 returning *", [id]);
       return row ? toAnnouncement(row) : null;
+    },
+
+    async createShuttleRequest(input) {
+      const row = await first<any>("createShuttleRequest", `insert into public.shuttle_requests
+        (user_id, dates, origin, destination, departure_time, arrival_time, passenger_count, purpose, estimated_gas, estimated_toll, estimated_other)
+        values ($1,$2::date[],$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
+        [input.userId, input.dates, input.origin, input.destination, input.departureTime, input.arrivalTime, input.passengerCount, input.purpose, input.estimatedGas, input.estimatedToll, input.estimatedOther]);
+      return mapShuttle(row!);
+    },
+    async listShuttleRequestsForUser(userId) {
+      return (await query<any>("listShuttleRequestsForUser", `select s.*, p.full_name requester_name, p.email requester_email, p.phone requester_phone,
+        d.full_name driver_name, r.full_name reviewer_name from public.shuttle_requests s join public.profiles p on p.id=s.user_id
+        left join public.profiles d on d.id=s.driver_id left join public.profiles r on r.id=s.reviewed_by where s.user_id=$1 order by s.created_at desc`, [userId])).map(mapShuttleDetails);
+    },
+    async listShuttleRequests(status) {
+      return (await query<any>("listShuttleRequests", `select s.*, p.full_name requester_name, p.email requester_email, p.phone requester_phone,
+        d.full_name driver_name, r.full_name reviewer_name from public.shuttle_requests s join public.profiles p on p.id=s.user_id
+        left join public.profiles d on d.id=s.driver_id left join public.profiles r on r.id=s.reviewed_by
+        where $1::text is null or s.status=$1 order by s.created_at desc`, [status ?? null])).map(mapShuttleDetails);
+    },
+    async reviewShuttleRequest(input) {
+      const row = await first<any>("reviewShuttleRequest", `update public.shuttle_requests set status=$2,
+        denial_reason=$3, driver_id=$4, final_gas=$5, final_toll=$6, final_other=$7,
+        reviewed_by=public.app_current_user_id(), reviewed_at=now() where id=$1 and status='pending' returning *`,
+        [input.id, input.status, input.denialReason ?? null, input.driverId ?? null, input.finalGas ?? null, input.finalToll ?? null, input.finalOther ?? null]);
+      return row ? mapShuttle(row) : null;
+    },
+    async listShuttleDrivers() {
+      return query<any>("listShuttleDrivers", "select id, full_name from public.profiles where access_status='active' order by full_name").then(rows => rows.map(r => ({ id: r.id, fullName: r.full_name })));
+    },
+    async getShuttleCostSummary() {
+      const row = await first<any>("getShuttleCostSummary", `select coalesce(sum(estimated_gas+estimated_toll+estimated_other),0) estimated,
+        coalesce(sum(coalesce(final_gas,0)+coalesce(final_toll,0)+coalesce(final_other,0)),0) final,
+        count(*) filter (where status='approved')::int approved_count from public.shuttle_requests`);
+      return { estimated: Number(row?.estimated ?? 0), final: Number(row?.final ?? 0), approvedCount: Number(row?.approved_count ?? 0) };
     },
 
     async getRoomLayout(roomId) {
