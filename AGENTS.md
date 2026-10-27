@@ -110,11 +110,17 @@ The member dashboard should feel like a modern digital church bulletin board, no
 - Do not silently fall back to mock data in production.
 - Avoid TODOs in critical functionality.
 
-## Workflow & Agent Assignment
+## Workflow, Git & Agent Assignment
 - Inspect existing files before editing.
 - Research before designing.
 - **MANDATORY AGENT ASSIGNMENT:** Always and strictly use the `@fullstack-craft` subagent for ALL code changes, feature implementations, and UI/UX craftsmanship. Do NOT code directly in the main orchestrator agent.
-- **DEPLOYMENT & GIT CONSTRAINT:** Never deploy to Vercel and never push to git (`git push`) unless explicitly asked by the user. All testing must be kept on `localhost`.
+- **DUAL-PUSH & BRANCH RULE (STRICT):**
+  - **NEVER push directly to `main`** on any repository.
+  - Active development work is strictly on the **`development`** branch.
+  - Every time a push is requested, it **MUST be pushed to BOTH repositories**:
+    1. Fork repo: `https://github.com/crdo0923/Booking-System-Victory-For-vercel-auto-deploy.git` (Triggers Vercel auto-deploy)
+    2. Main collaborator repo: `https://github.com/makifornanin/Booking-System-Victory.git` (Keeps team in sync)
+  - Remote `both` is pre-configured with dual push URLs: `git push both development`.
 - **RICARDO'S SCOPE ONLY:** Stick strictly to Ricardo's assigned roadmap (Rooms CRUD, Spandi Layouts, Tablet/TV Displays, Inventory, Assets, RBAC). Leave Expenses/Electricity on hold.
 - Build the simplest correct implementation first.
 - Test what you build.
