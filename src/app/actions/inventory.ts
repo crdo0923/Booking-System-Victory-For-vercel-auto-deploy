@@ -6,9 +6,12 @@ import {
   createInventoryItemService,
   updateInventoryItemService,
   archiveInventoryItemService,
+  recordStockTransactionService,
+  getInventoryReportsService,
 } from "@/lib/services/inventory";
 import { getInventoryDeps } from "@/lib/services/deps";
 import type { ServiceResult } from "@/lib/services/result";
+import type { InventoryReportSummary } from "@/lib/data/types";
 
 export type InventoryActionState = ServiceResult<{ id: string }> | null;
 
@@ -57,4 +60,26 @@ export async function archiveInventoryItemAction(id: string): Promise<ServiceRes
     revalidateInventoryViews();
   }
   return result;
+}
+
+export async function recordStockTransactionAction(
+  _prev: InventoryActionState,
+  formData: FormData,
+): Promise<InventoryActionState> {
+  const result = await recordStockTransactionService(
+    formData,
+    await getCurrentUser(),
+    await getInventoryDeps(),
+  );
+  if (result.ok) {
+    revalidateInventoryViews();
+  }
+  return result;
+}
+
+export async function getInventoryReportsAction(): Promise<ServiceResult<InventoryReportSummary>> {
+  return getInventoryReportsService(
+    await getCurrentUser(),
+    await getInventoryDeps(),
+  );
 }

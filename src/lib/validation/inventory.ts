@@ -27,3 +27,27 @@ export type InventoryItemFields = z.infer<typeof inventoryItemFieldsSchema>;
 export const inventoryItemIdSchema = z.object({
   id: z.string().trim().min(1, "Inventory item ID is required."),
 });
+
+export const INVENTORY_TRANSACTION_TYPES = [
+  "stock_in_restock",
+  "stock_out_booking",
+  "stock_out_ministry",
+  "adjustment_loss_waste",
+] as const;
+
+export const inventoryTransactionSchema = z.object({
+  itemId: z.string().trim().min(1, "Please select an inventory item."),
+  transactionType: z.enum(INVENTORY_TRANSACTION_TYPES, {
+    message: "Please select a valid transaction type.",
+  }),
+  quantity: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+    z.number().int("Quantity must be a whole number.").min(1, "Quantity must be at least 1.").max(100000),
+  ),
+  roomId: optional(z.string().trim().min(1)),
+  bookingId: optional(z.string().trim().min(1)),
+  recipientOrMinistry: optional(z.string().trim().max(100)),
+  notes: optional(z.string().trim().max(500)),
+});
+
+export type InventoryTransactionFields = z.infer<typeof inventoryTransactionSchema>;

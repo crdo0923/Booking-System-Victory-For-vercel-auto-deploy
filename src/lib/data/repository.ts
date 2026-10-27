@@ -153,6 +153,11 @@ export interface Repository {
   createInventoryItem(input: CreateInventoryItemInput): Promise<InventoryItem>;
   updateInventoryItem(id: string, input: UpdateInventoryItemInput): Promise<InventoryItem | null>;
   archiveInventoryItem(id: string): Promise<boolean>;
+
+  // Inventory Transactions & Movements
+  recordInventoryTransaction(input: import("@/lib/data/types").CreateTransactionInput): Promise<import("@/lib/data/types").InventoryTransaction>;
+  listInventoryTransactions(filter?: import("@/lib/data/types").InventoryTransactionFilter): Promise<import("@/lib/data/types").InventoryTransaction[]>;
+  getInventoryReportSummary(): Promise<import("@/lib/data/types").InventoryReportSummary>;
 }
 
 /** Private object storage. Keys use the prefixes announcements/, rooms/ and maps/. */

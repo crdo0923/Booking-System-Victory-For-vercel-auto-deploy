@@ -4,6 +4,8 @@ import {
   createInventoryItemService,
   updateInventoryItemService,
   archiveInventoryItemService,
+  recordStockTransactionService,
+  getInventoryReportsService,
 } from "@/lib/services/inventory";
 import { admin, member } from "./fakes";
 
@@ -98,5 +100,77 @@ describe("Inventory Consumables Service & Repository", () => {
 
     const allItems = await repo.listInventoryItems(true);
     expect(allItems.some((i) => i.id === itemToArchive.id && i.isArchived)).toBe(true);
+  });
+
+  it("records stock-in (restock) and updates the item balance atomically", async () => {
+    const repo = createDemoRepository();
+    const items = await repo.listInventoryItems(false);
+    const item = items[0];
+    const initialStock = item.currentStock;
+
+    const formData = new FormData();
+    formData.set("itemId", item.id);
+    formData.set("transactionType", "stock_in_restock");
+    formData.set("quantity", "15");
+    formData.set("recipientOrMinistry", "Direct Delivery Supplier");
+    formData.set("notes", "Invoice #PO-8821");
+
+    const result = await recordStockTransactionService(formData, admin, { repo });
+    expect(result.ok).toBe(true);
+
+    const updatedItem = await repo.getInventoryItem(item.id);
+    expect(updatedItem?.currentStock).toBe(initialStock + 15);
+
+    const txs = await repo.listInventoryTransactions({ itemId: item.id });
+    expect(txs.length).toBeGreaterThanOrEqual(1);
+    expect(txs[0].transactionType).toBe("stock_in_restock");
+    expect(txs[0].quantity).toBe(15);
+    expect(txs[0].balanceAfter).toBe(initialStock + 15);
+  });
+
+  it("records stock-out and prevents overdraft when quantity exceeds on-hand stock", async () => {
+    const repo = createDemoRepository();
+    const items = await repo.listInventoryItems(false);
+    const item = items.find((i) => i.currentStock > 0)!;
+
+    // Overdraft attempt
+    const overdraftForm = new FormData();
+    overdraftForm.set("itemId", item.id);
+    overdraftForm.set("transactionType", "stock_out_ministry");
+    overdraftForm.set("quantity", String(item.currentStock + 500));
+
+    const overdraftResult = await recordStockTransactionService(overdraftForm, admin, { repo });
+    expect(overdraftResult.ok).toBe(false);
+    if (!overdraftResult.ok) {
+      expect(overdraftResult.code).toBe("invalid");
+    }
+
+    // Valid stock out
+    const validForm = new FormData();
+    validForm.set("itemId", item.id);
+    validForm.set("transactionType", "stock_out_ministry");
+    validForm.set("quantity", "1");
+    validForm.set("recipientOrMinistry", "Sunday School");
+
+    const validResult = await recordStockTransactionService(validForm, admin, { repo });
+    expect(validResult.ok).toBe(true);
+
+    const afterItem = await repo.getInventoryItem(item.id);
+    expect(afterItem?.currentStock).toBe(item.currentStock - 1);
+  });
+
+  it("generates aggregated inventory reports with movement trends and low stock warnings", async () => {
+    const repo = createDemoRepository();
+    const reportResult = await getInventoryReportsService(admin, { repo });
+
+    expect(reportResult.ok).toBe(true);
+    if (reportResult.ok) {
+      const summary = reportResult.data;
+      expect(summary.totalItems).toBeGreaterThanOrEqual(10);
+      expect(summary.totalRestockedQuantity).toBeGreaterThan(0);
+      expect(summary.totalConsumedQuantity).toBeGreaterThan(0);
+      expect(summary.activeReorderWarnings.length).toBeGreaterThan(0);
+      expect(summary.consumedByMinistry.length).toBeGreaterThan(0);
+    }
   });
 });

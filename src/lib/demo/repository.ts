@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { MAX_PENDING_PER_USER } from "@/lib/config";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type ImageStorage, type Repository } from "@/lib/data/repository";
-import type { AccessChange, AccessStatus, Announcement, Booking, BookingDetails, BookingWithRoom, InventoryItem, Profile, RescheduleRequest, RescheduleStatus } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, Profile, RescheduleRequest, RescheduleStatus } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 import { rangesOverlap, toRange } from "@/lib/domain/availability";
 import { isBlockingStatus, PAST_DUE_MESSAGE, validateBookingWindow } from "@/lib/domain/booking-rules";
@@ -770,6 +770,149 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       item.isArchived = true;
       item.updatedAt = new Date().toISOString();
       return true;
+    },
+
+    async recordInventoryTransaction(input) {
+      state.inventoryItems ??= [];
+      state.inventoryTransactions ??= [];
+      const item = state.inventoryItems.find((i) => i.id === input.itemId);
+      if (!item) {
+        throw new RepositoryError("not_found", "Inventory item not found.");
+      }
+
+      if (input.quantity <= 0) {
+        throw new RepositoryError("invalid", "Transaction quantity must be greater than zero.");
+      }
+
+      const isStockIn = input.transactionType === "stock_in_restock";
+      let newBalance = item.currentStock;
+
+      if (isStockIn) {
+        newBalance += input.quantity;
+      } else {
+        if (item.currentStock < input.quantity) {
+          throw new RepositoryError("invalid", `Cannot consume ${input.quantity} ${item.unit}. Only ${item.currentStock} in stock.`);
+        }
+        newBalance -= input.quantity;
+      }
+
+      item.currentStock = newBalance;
+      item.updatedAt = new Date().toISOString();
+
+      const creator = state.users.find((u) => u.id === input.createdBy);
+      const room = input.roomId ? state.rooms.find((r) => r.id === input.roomId) : null;
+
+      const tx: InventoryTransaction = {
+        id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        itemId: item.id,
+        itemName: item.name,
+        itemCategory: item.category,
+        itemUnit: item.unit,
+        transactionType: input.transactionType,
+        quantity: input.quantity,
+        balanceAfter: newBalance,
+        roomId: input.roomId ?? null,
+        roomName: room?.name ?? null,
+        bookingId: input.bookingId ?? null,
+        recipientOrMinistry: input.recipientOrMinistry?.trim() || null,
+        notes: input.notes?.trim() || null,
+        createdBy: input.createdBy,
+        createdByName: creator?.fullName ?? "Staff Admin",
+        createdAt: new Date().toISOString(),
+      };
+
+      state.inventoryTransactions.unshift(tx);
+      return copy(tx);
+    },
+
+    async listInventoryTransactions(filter) {
+      state.inventoryTransactions ??= [];
+      let txs = [...state.inventoryTransactions];
+
+      if (filter?.itemId) {
+        txs = txs.filter((t) => t.itemId === filter.itemId);
+      }
+      if (filter?.roomId) {
+        txs = txs.filter((t) => t.roomId === filter.roomId);
+      }
+      if (filter?.type && filter.type !== "all") {
+        txs = txs.filter((t) => t.transactionType === filter.type);
+      }
+      if (filter?.from) {
+        const fromDate = new Date(filter.from).getTime();
+        txs = txs.filter((t) => new Date(t.createdAt).getTime() >= fromDate);
+      }
+      if (filter?.to) {
+        const toDate = new Date(filter.to).getTime();
+        txs = txs.filter((t) => new Date(t.createdAt).getTime() <= toDate);
+      }
+
+      txs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return copy(txs);
+    },
+
+    async getInventoryReportSummary() {
+      state.inventoryItems ??= [];
+      state.inventoryTransactions ??= [];
+
+      const activeItems = state.inventoryItems.filter((i) => !i.isArchived);
+      let lowStockCount = 0;
+      let outOfStockCount = 0;
+      const activeWarnings: InventoryItem[] = [];
+
+      for (const item of activeItems) {
+        if (item.currentStock <= 0) {
+          outOfStockCount++;
+          activeWarnings.push(item);
+        } else if (item.currentStock <= item.reorderThreshold) {
+          lowStockCount++;
+          activeWarnings.push(item);
+        }
+      }
+
+      let totalRestocked = 0;
+      let totalConsumed = 0;
+      const roomMap = new Map<string, { roomName: string; quantity: number }>();
+      const ministryMap = new Map<string, number>();
+
+      for (const tx of state.inventoryTransactions) {
+        if (tx.transactionType === "stock_in_restock") {
+          totalRestocked += tx.quantity;
+        } else {
+          totalConsumed += tx.quantity;
+          if (tx.roomId) {
+            const current = roomMap.get(tx.roomId) ?? { roomName: tx.roomName || "Assigned Room", quantity: 0 };
+            current.quantity += tx.quantity;
+            roomMap.set(tx.roomId, current);
+          }
+          if (tx.recipientOrMinistry) {
+            const current = ministryMap.get(tx.recipientOrMinistry) ?? 0;
+            ministryMap.set(tx.recipientOrMinistry, current + tx.quantity);
+          }
+        }
+      }
+
+      const consumedByRoom = Array.from(roomMap.entries()).map(([roomId, data]) => ({
+        roomId,
+        roomName: data.roomName,
+        quantity: data.quantity,
+      }));
+
+      const consumedByMinistry = Array.from(ministryMap.entries()).map(([ministry, quantity]) => ({
+        ministry,
+        quantity,
+      }));
+
+      return {
+        totalItems: activeItems.length,
+        lowStockItemsCount: lowStockCount,
+        outOfStockItemsCount: outOfStockCount,
+        totalRestockedQuantity: totalRestocked,
+        totalConsumedQuantity: totalConsumed,
+        consumedByRoom,
+        consumedByMinistry,
+        activeReorderWarnings: copy(activeWarnings),
+      };
     },
   };
 }

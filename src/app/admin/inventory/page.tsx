@@ -1,28 +1,38 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth/session";
-import { getInventoryItems } from "@/lib/data/queries";
+import { getActiveRooms, getInventoryItems, getInventoryReportSummary, getInventoryTransactions } from "@/lib/data/queries";
 import { PageHeader } from "@/components/ui/page-header";
 import { InventoryManager } from "@/components/admin/inventory-manager";
 
 export const metadata: Metadata = {
   title: "Inventory",
-  description: "Manage church consumables, stock levels, and automatic reorder thresholds.",
+  description: "Manage church consumables, stock in/out movements, and stewardship reports.",
 };
 
 export default async function AdminInventoryPage() {
   await requireAdmin();
 
-  const items = await getInventoryItems(false);
+  const [items, transactions, summary, rooms] = await Promise.all([
+    getInventoryItems(false),
+    getInventoryTransactions(),
+    getInventoryReportSummary(),
+    getActiveRooms(),
+  ]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         variant="operational"
-        title="Consumables Catalog"
-        description="Master inventory of communion elements, AV batteries, hospitality supplies, and sanitation items with reorder triggers."
+        title="Inventory & Resource Stewardship"
+        description="Master consumables catalog, stock in/out movement ledger, and church-wide consumption reports."
       />
 
-      <InventoryManager initialItems={items} />
+      <InventoryManager
+        initialItems={items}
+        initialTransactions={transactions}
+        initialSummary={summary}
+        rooms={rooms}
+      />
     </div>
   );
 }

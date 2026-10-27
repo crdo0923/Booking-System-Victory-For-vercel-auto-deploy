@@ -15,6 +15,8 @@ import type {
   UserSummary,
   InventoryCategory,
   InventoryItem,
+  InventoryTransaction,
+  InventoryTransactionType,
   InventoryUnit,
 } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
@@ -339,6 +341,46 @@ export function toInventoryItem(row: InventoryItemRow): InventoryItem {
     isArchived: Boolean(row.is_archived),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
+  };
+}
+
+export interface InventoryTransactionRow {
+  id: string;
+  item_id: string;
+  item_name?: string | null;
+  item_category?: InventoryCategory | null;
+  item_unit?: InventoryUnit | null;
+  transaction_type: InventoryTransactionType;
+  quantity: number;
+  balance_after: number;
+  room_id: string | null;
+  room_name?: string | null;
+  booking_id: string | null;
+  recipient_or_ministry: string | null;
+  notes: string | null;
+  created_by: string;
+  created_by_name?: string | null;
+  created_at: Timestamp;
+}
+
+export function toInventoryTransaction(row: InventoryTransactionRow): InventoryTransaction {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    itemName: row.item_name ?? undefined,
+    itemCategory: row.item_category ?? undefined,
+    itemUnit: row.item_unit ?? undefined,
+    transactionType: row.transaction_type,
+    quantity: Number(row.quantity),
+    balanceAfter: Number(row.balance_after),
+    roomId: row.room_id,
+    roomName: row.room_name ?? undefined,
+    bookingId: row.booking_id,
+    recipientOrMinistry: row.recipient_or_ministry,
+    notes: row.notes,
+    createdBy: row.created_by,
+    createdByName: row.created_by_name ?? undefined,
+    createdAt: iso(row.created_at),
   };
 }
 

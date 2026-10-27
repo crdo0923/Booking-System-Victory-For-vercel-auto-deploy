@@ -38,3 +38,11 @@ export const getInventoryItems = cache(async (includeArchived?: boolean) =>
   (await getRepositoryForRequest()).listInventoryItems(includeArchived),
 );
 
+export const getInventoryTransactions = cache(async (filter?: import("@/lib/data/types").InventoryTransactionFilter) =>
+  (await getRepositoryForRequest()).listInventoryTransactions(filter),
+);
+
+export const getInventoryReportSummary = cache(async () =>
+  (await getRepositoryForRequest()).getInventoryReportSummary(),
+);
+

@@ -1,7 +1,7 @@
 import "server-only";
 import { asMember } from "@/lib/db/client";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type Repository } from "@/lib/data/repository";
-import type { AccessStatus, AnnouncementInput, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomLayout } from "@/lib/data/types";
+import type { AccessStatus, AnnouncementInput, InventoryItem, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomLayout } from "@/lib/data/types";
 import { PAST_DUE_MESSAGE, type BookingStatus } from "@/lib/domain/booking-rules";
 import { INACTIVE_PROMOTION_MESSAGE, LAST_ADMIN_MESSAGE, OWN_ROLE_MESSAGE, SAME_ROLE_MESSAGE } from "@/lib/domain/roles";
 import {
@@ -17,6 +17,7 @@ import {
   toRoom,
   toUserSummary,
   toInventoryItem,
+  toInventoryTransaction,
   type AccessEventRow,
   type AnnouncementRow,
   type BookingDetailsRow,
@@ -26,6 +27,7 @@ import {
   type RescheduleRow,
   type RoomRow,
   type InventoryItemRow,
+  type InventoryTransactionRow,
 } from "@/lib/data/postgres/rows";
 
 /** Messages raised by database triggers/functions, mapped to user-facing text. */
@@ -903,6 +905,178 @@ export function createPostgresRepository(actorId: string | null): Repository {
         [id],
       );
       return rows.length > 0;
+    },
+
+    async recordInventoryTransaction(input) {
+      if (input.quantity <= 0) {
+        throw new RepositoryError("invalid", "Transaction quantity must be greater than zero.");
+      }
+
+      const item = await this.getInventoryItem(input.itemId);
+      if (!item) {
+        throw new RepositoryError("not_found", "Inventory item not found.");
+      }
+
+      const isStockIn = input.transactionType === "stock_in_restock";
+      let newBalance = item.currentStock;
+
+      if (isStockIn) {
+        newBalance += input.quantity;
+      } else {
+        if (item.currentStock < input.quantity) {
+          throw new RepositoryError(
+            "invalid",
+            `Cannot consume ${input.quantity} ${item.unit}. Only ${item.currentStock} in stock.`,
+          );
+        }
+        newBalance -= input.quantity;
+      }
+
+      // Update item balance
+      await query(
+        "updateItemBalance",
+        `update public.inventory_items
+         set current_stock = $2, updated_at = now()
+         where id = $1`,
+        [input.itemId, newBalance],
+      );
+
+      // Insert transaction record
+      const row = await first<InventoryTransactionRow>(
+        "recordInventoryTransaction",
+        `insert into public.inventory_transactions (
+           item_id, transaction_type, quantity, balance_after, room_id, booking_id,
+           recipient_or_ministry, notes, created_by
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         returning id, item_id, transaction_type, quantity, balance_after, room_id,
+                   booking_id, recipient_or_ministry, notes, created_by, created_at`,
+        [
+          input.itemId,
+          input.transactionType,
+          input.quantity,
+          newBalance,
+          input.roomId ?? null,
+          input.bookingId ?? null,
+          input.recipientOrMinistry?.trim() || null,
+          input.notes?.trim() || null,
+          input.createdBy,
+        ],
+      );
+
+      if (!row) {
+        throw new RepositoryError("unknown", "Could not record inventory transaction.");
+      }
+
+      const mapped = toInventoryTransaction(row);
+      mapped.itemName = item.name;
+      mapped.itemCategory = item.category;
+      mapped.itemUnit = item.unit;
+      return mapped;
+    },
+
+    async listInventoryTransactions(filter) {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+
+      if (filter?.itemId) {
+        values.push(filter.itemId);
+        conditions.push(`t.item_id = $${values.length}`);
+      }
+      if (filter?.roomId) {
+        values.push(filter.roomId);
+        conditions.push(`t.room_id = $${values.length}`);
+      }
+      if (filter?.type && filter.type !== "all") {
+        values.push(filter.type);
+        conditions.push(`t.transaction_type = $${values.length}`);
+      }
+      if (filter?.from) {
+        values.push(filter.from);
+        conditions.push(`t.created_at >= $${values.length}`);
+      }
+      if (filter?.to) {
+        values.push(filter.to);
+        conditions.push(`t.created_at <= $${values.length}`);
+      }
+
+      const whereClause = conditions.length > 0 ? `where ${conditions.join(" and ")}` : "";
+
+      const rows = await query<InventoryTransactionRow>(
+        "listInventoryTransactions",
+        `select t.id, t.item_id, t.transaction_type, t.quantity, t.balance_after,
+                t.room_id, t.booking_id, t.recipient_or_ministry, t.notes, t.created_by, t.created_at,
+                i.name as item_name, i.category as item_category, i.unit as item_unit,
+                r.name as room_name,
+                u.full_name as created_by_name
+         from public.inventory_transactions t
+         join public.inventory_items i on i.id = t.item_id
+         left join public.rooms r on r.id = t.room_id
+         left join public.profiles u on u.id = t.created_by
+         ${whereClause}
+         order by t.created_at desc`,
+        values,
+      );
+
+      return rows.map(toInventoryTransaction);
+    },
+
+    async getInventoryReportSummary() {
+      const items = await this.listInventoryItems(false);
+      const txs = await this.listInventoryTransactions();
+
+      let lowStockCount = 0;
+      let outOfStockCount = 0;
+      const activeWarnings: InventoryItem[] = [];
+
+      for (const item of items) {
+        if (item.currentStock <= 0) {
+          outOfStockCount++;
+          activeWarnings.push(item);
+        } else if (item.currentStock <= item.reorderThreshold) {
+          lowStockCount++;
+          activeWarnings.push(item);
+        }
+      }
+
+      let totalRestocked = 0;
+      let totalConsumed = 0;
+      const roomMap = new Map<string, { roomName: string; quantity: number }>();
+      const ministryMap = new Map<string, number>();
+
+      for (const tx of txs) {
+        if (tx.transactionType === "stock_in_restock") {
+          totalRestocked += tx.quantity;
+        } else {
+          totalConsumed += tx.quantity;
+          if (tx.roomId) {
+            const current = roomMap.get(tx.roomId) ?? { roomName: tx.roomName || "Room", quantity: 0 };
+            current.quantity += tx.quantity;
+            roomMap.set(tx.roomId, current);
+          }
+          if (tx.recipientOrMinistry) {
+            const current = ministryMap.get(tx.recipientOrMinistry) ?? 0;
+            ministryMap.set(tx.recipientOrMinistry, current + tx.quantity);
+          }
+        }
+      }
+
+      return {
+        totalItems: items.length,
+        lowStockItemsCount: lowStockCount,
+        outOfStockItemsCount: outOfStockCount,
+        totalRestockedQuantity: totalRestocked,
+        totalConsumedQuantity: totalConsumed,
+        consumedByRoom: Array.from(roomMap.entries()).map(([roomId, data]) => ({
+          roomId,
+          roomName: data.roomName,
+          quantity: data.quantity,
+        })),
+        consumedByMinistry: Array.from(ministryMap.entries()).map(([ministry, quantity]) => ({
+          ministry,
+          quantity,
+        })),
+        activeReorderWarnings: activeWarnings,
+      };
     },
   };
   return repo;

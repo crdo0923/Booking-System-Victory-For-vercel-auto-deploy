@@ -327,4 +327,59 @@ export interface UpdateInventoryItemInput {
   isArchived?: boolean;
 }
 
+export type InventoryTransactionType =
+  | "stock_in_restock"
+  | "stock_out_booking"
+  | "stock_out_ministry"
+  | "adjustment_loss_waste";
+
+export interface InventoryTransaction {
+  id: string;
+  itemId: string;
+  itemName?: string;
+  itemCategory?: InventoryCategory;
+  itemUnit?: InventoryUnit;
+  transactionType: InventoryTransactionType;
+  quantity: number;
+  balanceAfter: number;
+  roomId?: string | null;
+  roomName?: string | null;
+  bookingId?: string | null;
+  recipientOrMinistry?: string | null;
+  notes?: string | null;
+  createdBy: string;
+  createdByName?: string | null;
+  createdAt: string;
+}
+
+export interface CreateTransactionInput {
+  itemId: string;
+  transactionType: InventoryTransactionType;
+  quantity: number;
+  roomId?: string | null;
+  bookingId?: string | null;
+  recipientOrMinistry?: string | null;
+  notes?: string | null;
+  createdBy: string;
+}
+
+export interface InventoryTransactionFilter {
+  itemId?: string;
+  roomId?: string;
+  type?: InventoryTransactionType | string;
+  from?: string;
+  to?: string;
+}
+
+export interface InventoryReportSummary {
+  totalItems: number;
+  lowStockItemsCount: number;
+  outOfStockItemsCount: number;
+  totalRestockedQuantity: number;
+  totalConsumedQuantity: number;
+  consumedByRoom: Array<{ roomId: string; roomName: string; quantity: number }>;
+  consumedByMinistry: Array<{ ministry: string; quantity: number }>;
+  activeReorderWarnings: InventoryItem[];
+}
+
 
