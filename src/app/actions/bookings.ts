@@ -7,7 +7,7 @@ import { buildStatusPayload, deliverStatusWebhook } from "@/lib/bot/status-webho
 import { getRepository } from "@/lib/data";
 import { getStatusWebhookConfig } from "@/lib/env";
 import { ConfigError } from "@/lib/env";
-import { approveBooking, cancelBooking, createBookingRequest, denyBooking, retryDenialEmail, type ApprovalResult, type DenialResult } from "@/lib/services/bookings";
+import { approveBooking, cancelBooking, createBookingRequest, denyBooking, editApprovedBooking, retryDenialEmail, type AdminEditResult, type ApprovalResult, type DenialResult } from "@/lib/services/bookings";
 import { retryCalendarSync } from "@/lib/services/calendar-sync";
 import { retryStatusNotification } from "@/lib/services/status-notifications";
 import { getBookingDeps, getCalendarSyncDeps } from "@/lib/services/deps";
@@ -15,6 +15,7 @@ import { failure, type ServiceResult } from "@/lib/services/result";
 
 export type BookingActionState = ServiceResult<{ bookingId: string }> | null;
 export type ReviewActionState = ServiceResult<DenialResult> | null;
+export type AdminEditActionState = ServiceResult<AdminEditResult> | null;
 
 const BOOKING_FIELDS = ["roomId", "date", "startTime", "endTime", "eventName", "eventType", "attendeeCount", "purpose"] as const;
 
@@ -82,6 +83,16 @@ export async function denyBookingAction(_prev: ReviewActionState, formData: Form
 export async function retryDenialEmailAction(bookingId: string): Promise<ServiceResult> {
   const result = await withConfig(async () => retryDenialEmail({ bookingId }, await getCurrentUser(), await getBookingDeps()));
   revalidateAdminViews(bookingId);
+  return result;
+}
+
+export async function editApprovedBookingAction(_prev: AdminEditActionState, formData: FormData): Promise<AdminEditActionState> {
+  const input = Object.fromEntries(["bookingId", "roomId", "date", "startTime", "endTime", "eventName", "eventType", "attendeeCount", "purpose"].map((key) => [key, formData.get(key) ?? ""]));
+  const result = await withConfig(async () => editApprovedBooking(input, await getCurrentUser(), await getBookingDeps()));
+  if (result.ok) {
+    revalidateMemberViews();
+    revalidateAdminViews(String(input.bookingId));
+  }
   return result;
 }
 

@@ -3,20 +3,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { addDays, format, startOfWeek } from "date-fns";
 import { DAY_END_HOUR, DAY_START_HOUR, MAX_BOOKING_MINUTES, SLOT_MINUTES } from "@/lib/config";
 import { requireUser } from "@/lib/auth/session";
 import { imageUrl } from "@/lib/data";
 import { getActiveRooms, getRepositoryForRequest } from "@/lib/data/queries";
 import type { Room } from "@/lib/data/types";
-import { buildDaySlots } from "@/lib/domain/availability";
-import { formatDateKey } from "@/lib/domain/time";
+import { buildDaySlots, groupIntoSegments } from "@/lib/domain/availability";
+import { formatDateKey, formatTimeRange } from "@/lib/domain/time";
 import { ConfigError } from "@/lib/env";
 import { getCalendarGateway } from "@/lib/ghl/gateway";
 import { getGoogleCalendar } from "@/lib/google/gateway";
 import { bookableDateRange, getRoomDayAvailability } from "@/lib/services/availability";
 import { firstParam, parseDateKey, parseRoomSlug } from "@/lib/validation/params";
 import { BookingPanel } from "@/components/bookings/booking-panel";
-import { MonthCalendar } from "@/components/rooms/month-calendar";
+import { WeekCalendar } from "@/components/rooms/week-calendar";
 import { RoomVisual } from "@/components/rooms/room-visual";
 import { Notice } from "@/components/ui/notice";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -111,21 +112,67 @@ export default async function RoomPage({ params, searchParams }: PageProps<"/roo
           </Notice>
         )}
 
-        <div className="mt-8 grid gap-10 lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:gap-14">
-          <div className="lg:sticky lg:top-24 lg:self-start">
-            <p className="mb-4 text-lg font-extrabold">
-              <span className="mr-2 font-serif text-base font-normal text-subtle">1</span>
-              Choose a date
-            </p>
-            <MonthCalendar selected={dateKey} first={first} last={last} hrefFor={(key) => `/rooms/${room.slug}?date=${key}`} />
-          </div>
-          <Suspense key={dateKey} fallback={<ScheduleSkeleton />}>
-            <RoomSchedule room={room} dateKey={dateKey} userId={user.id} returnTo={`/rooms/${room.slug}?date=${dateKey}`} />
+        <div className="mt-8">
+          <p className="mb-4 text-lg font-extrabold">
+            <span className="mr-2 font-serif text-base font-normal text-subtle">1</span>
+            Choose a date
+          </p>
+          <Suspense key={`${room.id}-${dateKey.slice(0, 10)}`} fallback={<WeekCalendar selected={dateKey} first={first} last={last} availabilityByDate={{}} hrefFor={(key) => `/rooms/${room.slug}?date=${key}`} />}>
+            <RoomWeekCalendar room={room} selected={dateKey} first={first} last={last} />
           </Suspense>
+          <div className="mt-10">
+            <Suspense key={dateKey} fallback={<ScheduleSkeleton />}>
+              <RoomSchedule room={room} dateKey={dateKey} userId={user.id} returnTo={`/rooms/${room.slug}?date=${dateKey}`} />
+            </Suspense>
+          </div>
         </div>
       </section>
     </div>
   );
+}
+
+async function RoomWeekCalendar({ room, selected, first, last }: { room: Room; selected: string; first: string; last: string }) {
+  const availabilityByDate = await loadWeekAvailability(room, selected, first, last);
+  return (
+    <WeekCalendar
+      selected={selected}
+      first={first}
+      last={last}
+      availabilityByDate={availabilityByDate}
+      hrefFor={(key) => `/rooms/${room.slug}?date=${key}`}
+    />
+  );
+}
+
+async function loadWeekAvailability(room: Room, selected: string, first: string, last: string) {
+  try {
+    const [repo, calendar] = await Promise.all([getRepositoryForRequest(), getCalendarGateway()]);
+    const selectedDate = new Date(selected);
+    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    const dateKeys = Array.from({ length: 7 }, (_, index) => format(addDays(weekStart, index), "yyyy-MM-dd")).filter((dateKey) => dateKey >= first && dateKey <= last);
+    const results = await Promise.all(
+      dateKeys.map(async (dateKey) => {
+        const availability = await getRoomDayAvailability(room, dateKey, { repo, calendar, now: () => new Date() }, { forDisplay: true });
+        const segments = groupIntoSegments(availability.slots);
+        return [
+          dateKey,
+          {
+            booked: segments
+              .filter((segment) => segment.status === "reserved")
+              .map((segment) => formatTimeRange(segment.start, segment.end)),
+            unavailable: segments
+              .filter((segment) => segment.status === "unavailable")
+              .map((segment) => formatTimeRange(segment.start, segment.end)),
+          },
+        ] as const;
+      }),
+    );
+    return Object.fromEntries(results);
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    console.error(`[config] ${error.message}`);
+    return {};
+  }
 }
 
 async function loadAvailability(room: Room, dateKey: string, userId: string) {

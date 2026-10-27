@@ -16,6 +16,8 @@ import type {
   Role,
   Room,
   UserSummary,
+  ShuttleRequest,
+  ShuttleRequestDetails,
 } from "@/lib/data/types";
 
 export type RepositoryErrorCode = "conflict" | "duplicate" | "invalid" | "not_found" | "forbidden" | "unknown";
@@ -88,6 +90,16 @@ export interface Repository {
   cancelOwnBooking(id: string, userId: string): Promise<Booking | null>;
   /** Admin cancels an approved booking (after GHL was cancelled). */
   cancelApprovedBooking(id: string): Promise<Booking | null>;
+  adminEditApprovedBooking(input: {
+    bookingId: string;
+    roomId: string;
+    startTime: string;
+    endTime: string;
+    eventName: string;
+    eventType: string;
+    attendeeCount: number;
+    purpose: string;
+  }): Promise<Booking | null>;
   setCalendarSync(bookingId: string, eventId: string | null, error: string | null): Promise<void>;
   /** Admin-only: records whether the GHL email for the decision was sent (null = sent). */
   setBookingNotificationResult(bookingId: string, error: string | null): Promise<void>;
@@ -119,6 +131,13 @@ export interface Repository {
   createAnnouncement(input: AnnouncementInput, createdBy: string): Promise<Announcement>;
   updateAnnouncement(id: string, input: Partial<AnnouncementInput>): Promise<Announcement | null>;
   deleteAnnouncement(id: string): Promise<Announcement | null>;
+
+  createShuttleRequest(input: Omit<ShuttleRequest, "id"|"status"|"denialReason"|"finalGas"|"finalToll"|"finalOther"|"driverId"|"reviewedBy"|"reviewedAt"|"createdAt">): Promise<ShuttleRequest>;
+  listShuttleRequestsForUser(userId: string): Promise<ShuttleRequestDetails[]>;
+  listShuttleRequests(status?: import("@/lib/data/types").ShuttleStatus): Promise<ShuttleRequestDetails[]>;
+  reviewShuttleRequest(input: { id: string; status: "approved"|"denied"; denialReason?: string; driverId?: string|null; finalGas?: number; finalToll?: number; finalOther?: number }): Promise<ShuttleRequest | null>;
+  listShuttleDrivers(): Promise<Pick<Profile, "id"|"fullName">[]>;
+  getShuttleCostSummary(): Promise<{ estimated: number; final: number; approvedCount: number }>;
 }
 
 /** Private object storage. Keys use the prefixes announcements/, rooms/ and maps/. */

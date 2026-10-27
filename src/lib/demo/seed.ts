@@ -210,6 +210,7 @@ export function createDemoSeed(): DemoState {
     rooms,
     bookings,
     reschedules: [],
+    shuttles: [],
     announcements,
     files: new Map(),
     appointments: new Map(),

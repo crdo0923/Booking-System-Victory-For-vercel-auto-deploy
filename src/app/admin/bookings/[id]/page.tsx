@@ -83,8 +83,13 @@ export default async function AdminBookingPage({ params }: PageProps<"/admin/boo
             pastDue={pastDue}
             summary={{ event: booking.eventName, room: booking.room.name, date: dateLabel, time: timeLabel, requester: `${booking.requester.fullName} (${booking.requester.email})` }}
           />
-        ) : booking.status === "approved" && isUpcoming ? (
-          <CancelBookingButton bookingId={booking.id} eventName={booking.eventName} approved label="Cancel booking" />
+        ) : booking.status === "approved" ? (
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/admin/bookings/${booking.id}/edit`} className="inline-flex h-10 items-center justify-center rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover">
+              Edit booking
+            </Link>
+            {isUpcoming && <CancelBookingButton bookingId={booking.id} eventName={booking.eventName} approved label="Cancel booking" />}
+          </div>
         ) : null}
       </header>
 

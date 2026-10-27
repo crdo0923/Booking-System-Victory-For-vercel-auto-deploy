@@ -1,6 +1,6 @@
 import "server-only";
 import type { TimeRange } from "@/lib/domain/availability";
-import type { AccessChange, AccessStatus, Announcement, Booking, RescheduleRequest, Role, RoleChange, Room } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, Booking, RescheduleRequest, Role, RoleChange, Room, ShuttleRequest } from "@/lib/data/types";
 import { isProduction } from "@/lib/env";
 import { createDemoSeed } from "@/lib/demo/seed";
 
@@ -38,6 +38,7 @@ export interface DemoState {
   rooms: Room[];
   bookings: Booking[];
   reschedules: RescheduleRequest[];
+  shuttles: ShuttleRequest[];
   announcements: Announcement[];
   files: Map<string, { bytes: Uint8Array; contentType: string }>;
   /** Simulated GHL appointments, keyed by appointment id. */
@@ -60,6 +61,9 @@ export function getDemoState(): DemoState {
   if (isProduction()) {
     throw new Error("Demo data is not available in production.");
   }
-  globalForDemo.__victoryDemoState ??= createDemoSeed();
-  return globalForDemo.__victoryDemoState;
+  const state = (globalForDemo.__victoryDemoState ??= createDemoSeed());
+  // Preserve hot-reloaded demo sessions created before newer feature state
+  // was added.
+  state.shuttles ??= [];
+  return state;
 }

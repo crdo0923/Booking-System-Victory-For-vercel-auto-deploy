@@ -379,6 +379,21 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       return copy(booking);
     },
 
+    async adminEditApprovedBooking(input) {
+      const booking = state.bookings.find((b) => b.id === input.bookingId);
+      const room = state.rooms.find((r) => r.id === input.roomId && r.isActive);
+      if (!booking || booking.status !== "approved") throw new RepositoryError("invalid", "Only approved bookings can be edited.");
+      if (!room) throw new RepositoryError("invalid", "That room is not available.");
+      if (input.attendeeCount > room.capacity) throw new RepositoryError("invalid", "Attendee count exceeds room capacity.");
+      const range = toRange(input.startTime, input.endTime);
+      if (range.start <= Date.now() || range.end <= range.start) throw new RepositoryError("invalid", "That time is not valid.");
+      if (state.bookings.some((b) => b.id !== booking.id && b.roomId === room.id && isBlockingStatus(b.status) && rangesOverlap(toRange(b.startTime, b.endTime), range))) {
+        throw new RepositoryError("conflict", "That time overlaps another booking for this room.");
+      }
+      Object.assign(booking, input);
+      return copy(booking);
+    },
+
     // --- Reschedule requests (mirrors migration 0009) ------------------------
 
     async insertRescheduleRequest(input) {
@@ -567,7 +582,32 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       const [removed] = state.announcements.splice(index, 1);
       return copy(removed);
     },
+    async createShuttleRequest(input) {
+      const request = { ...input, id: randomUUID(), status: "pending" as const, denialReason: null, finalGas: null, finalToll: null, finalOther: null, driverId: null, reviewedBy: null, reviewedAt: null, createdAt: new Date().toISOString() };
+      state.shuttles.push(request);
+      return copy(request);
+    },
+    async listShuttleRequestsForUser(userId) {
+      return state.shuttles.filter(s=>s.userId===userId).map(s=>demoShuttleDetails(state,s));
+    },
+    async listShuttleRequests(status) {
+      return state.shuttles.filter(s=>!status || s.status===status).map(s=>demoShuttleDetails(state,s));
+    },
+    async reviewShuttleRequest(input) {
+      const s=state.shuttles.find(x=>x.id===input.id && x.status==="pending"); if(!s) return null;
+      Object.assign(s,{status:input.status, denialReason:input.denialReason??null, driverId:input.driverId??null, finalGas:input.finalGas??null, finalToll:input.finalToll??null, finalOther:input.finalOther??null, reviewedBy:actorId, reviewedAt:new Date().toISOString()});
+      return copy(s);
+    },
+    async listShuttleDrivers() { return state.users.filter(u=>u.accessStatus==="active").map(u=>({id:u.id,fullName:u.fullName})); },
+    async getShuttleCostSummary() {
+      return { estimated: state.shuttles.reduce((n,s)=>n+s.estimatedGas+s.estimatedToll+s.estimatedOther,0), final: state.shuttles.reduce((n,s)=>n+(s.finalGas??0)+(s.finalToll??0)+(s.finalOther??0),0), approvedCount: state.shuttles.filter(s=>s.status==="approved").length };
+    },
   };
+}
+
+function demoShuttleDetails(state: DemoState, s: import("@/lib/data/types").ShuttleRequest): import("@/lib/data/types").ShuttleRequestDetails {
+  const u=state.users.find(x=>x.id===s.userId)!; const d=s.driverId&&state.users.find(x=>x.id===s.driverId); const r=s.reviewedBy&&state.users.find(x=>x.id===s.reviewedBy);
+  return { ...copy(s), requester:{id:u.id,fullName:u.fullName,email:u.email,phone:u.phone}, driver:d?{id:d.id,fullName:d.fullName}:null, reviewer:r?{id:r.id,fullName:r.fullName}:null };
 }
 
 export function createDemoImageStorage(): ImageStorage {
