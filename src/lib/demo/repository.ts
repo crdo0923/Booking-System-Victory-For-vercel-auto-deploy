@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { MAX_PENDING_PER_USER } from "@/lib/config";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type ImageStorage, type Repository } from "@/lib/data/repository";
-import type { AccessChange, AccessStatus, Announcement, Booking, BookingDetails, BookingWithRoom, InventoryItem, Profile, RescheduleRequest, RescheduleStatus } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, AssetMovement, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, Profile, RescheduleRequest, RescheduleStatus, RoomAsset } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 import { rangesOverlap, toRange } from "@/lib/domain/availability";
 import { isBlockingStatus, PAST_DUE_MESSAGE, validateBookingWindow } from "@/lib/domain/booking-rules";
@@ -787,6 +787,7 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       return true;
     },
     async createShuttleRequest(input) {
+      state.shuttles ??= [];
       const request = { ...input, id: randomUUID(), status: "pending" as const, denialReason: null, finalGas: null, finalToll: null, finalOther: null, driverId: null, reviewedBy: null, reviewedAt: null, createdAt: new Date().toISOString() };
       state.shuttles.push(request);
       return copy(request);
@@ -805,6 +806,312 @@ export function createDemoRepository(actorId: string | null = null): Repository 
     async listShuttleDrivers() { return state.users.filter(u=>u.accessStatus==="active").map(u=>({id:u.id,fullName:u.fullName})); },
     async getShuttleCostSummary() {
       return { estimated: state.shuttles.reduce((n,s)=>n+s.estimatedGas+s.estimatedToll+s.estimatedOther,0), final: state.shuttles.reduce((n,s)=>n+(s.finalGas??0)+(s.finalToll??0)+(s.finalOther??0),0), approvedCount: state.shuttles.filter(s=>s.status==="approved").length };
+    },
+    async recordInventoryTransaction(input) {
+      state.inventoryItems ??= [];
+      state.inventoryTransactions ??= [];
+      const item = state.inventoryItems.find((i) => i.id === input.itemId);
+      if (!item) {
+        throw new RepositoryError("not_found", "Inventory item not found.");
+      }
+
+      if (input.quantity <= 0) {
+        throw new RepositoryError("invalid", "Transaction quantity must be greater than zero.");
+      }
+
+      const isStockIn = input.transactionType === "stock_in_restock";
+      let newBalance = item.currentStock;
+
+      if (isStockIn) {
+        newBalance += input.quantity;
+      } else {
+        if (item.currentStock < input.quantity) {
+          throw new RepositoryError("invalid", `Cannot consume ${input.quantity} ${item.unit}. Only ${item.currentStock} in stock.`);
+        }
+        newBalance -= input.quantity;
+      }
+
+      item.currentStock = newBalance;
+      item.updatedAt = new Date().toISOString();
+
+      const creator = state.users.find((u) => u.id === input.createdBy);
+      const room = input.roomId ? state.rooms.find((r) => r.id === input.roomId) : null;
+
+      const tx: InventoryTransaction = {
+        id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        itemId: item.id,
+        itemName: item.name,
+        itemCategory: item.category,
+        itemUnit: item.unit,
+        transactionType: input.transactionType,
+        quantity: input.quantity,
+        balanceAfter: newBalance,
+        roomId: input.roomId ?? null,
+        roomName: room?.name ?? null,
+        bookingId: input.bookingId ?? null,
+        recipientOrMinistry: input.recipientOrMinistry?.trim() || null,
+        notes: input.notes?.trim() || null,
+        createdBy: input.createdBy,
+        createdByName: creator?.fullName ?? "Staff Admin",
+        createdAt: new Date().toISOString(),
+      };
+
+      state.inventoryTransactions.unshift(tx);
+      return copy(tx);
+    },
+
+    async listInventoryTransactions(filter) {
+      state.inventoryTransactions ??= [];
+      let txs = [...state.inventoryTransactions];
+
+      if (filter?.itemId) {
+        txs = txs.filter((t) => t.itemId === filter.itemId);
+      }
+      if (filter?.roomId) {
+        txs = txs.filter((t) => t.roomId === filter.roomId);
+      }
+      if (filter?.type && filter.type !== "all") {
+        txs = txs.filter((t) => t.transactionType === filter.type);
+      }
+      if (filter?.from) {
+        const fromDate = new Date(filter.from).getTime();
+        txs = txs.filter((t) => new Date(t.createdAt).getTime() >= fromDate);
+      }
+      if (filter?.to) {
+        const toDate = new Date(filter.to).getTime();
+        txs = txs.filter((t) => new Date(t.createdAt).getTime() <= toDate);
+      }
+
+      txs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return copy(txs);
+    },
+
+    async getInventoryReportSummary() {
+      state.inventoryItems ??= [];
+      state.inventoryTransactions ??= [];
+
+      const activeItems = state.inventoryItems.filter((i) => !i.isArchived);
+      let lowStockCount = 0;
+      let outOfStockCount = 0;
+      const activeWarnings: InventoryItem[] = [];
+
+      for (const item of activeItems) {
+        if (item.currentStock <= 0) {
+          outOfStockCount++;
+          activeWarnings.push(item);
+        } else if (item.currentStock <= item.reorderThreshold) {
+          lowStockCount++;
+          activeWarnings.push(item);
+        }
+      }
+
+      let totalRestocked = 0;
+      let totalConsumed = 0;
+      const roomMap = new Map<string, { roomName: string; quantity: number }>();
+      const ministryMap = new Map<string, number>();
+
+      for (const tx of state.inventoryTransactions) {
+        if (tx.transactionType === "stock_in_restock") {
+          totalRestocked += tx.quantity;
+        } else {
+          totalConsumed += tx.quantity;
+          if (tx.roomId) {
+            const current = roomMap.get(tx.roomId) ?? { roomName: tx.roomName || "Assigned Room", quantity: 0 };
+            current.quantity += tx.quantity;
+            roomMap.set(tx.roomId, current);
+          }
+          if (tx.recipientOrMinistry) {
+            const current = ministryMap.get(tx.recipientOrMinistry) ?? 0;
+            ministryMap.set(tx.recipientOrMinistry, current + tx.quantity);
+          }
+        }
+      }
+
+      const consumedByRoom = Array.from(roomMap.entries()).map(([roomId, data]) => ({
+        roomId,
+        roomName: data.roomName,
+        quantity: data.quantity,
+      }));
+
+      const consumedByMinistry = Array.from(ministryMap.entries()).map(([ministry, quantity]) => ({
+        ministry,
+        quantity,
+      }));
+
+      return {
+        totalItems: activeItems.length,
+        lowStockItemsCount: lowStockCount,
+        outOfStockItemsCount: outOfStockCount,
+        totalRestockedQuantity: totalRestocked,
+        totalConsumedQuantity: totalConsumed,
+        consumedByRoom,
+        consumedByMinistry,
+        activeReorderWarnings: copy(activeWarnings),
+      };
+    },
+
+    // Room Assets & Movements
+    async listRoomAssets(options) {
+      state.roomAssets ??= [];
+      let assets = state.roomAssets;
+
+      if (!options?.includeArchived) {
+        assets = assets.filter((a) => !a.isArchived);
+      }
+      if (options?.roomId) {
+        assets = assets.filter((a) => a.roomId === options.roomId);
+      }
+      if (options?.isMovable !== undefined) {
+        assets = assets.filter((a) => a.isMovable === options.isMovable);
+      }
+
+      return copy(assets).map((a) => {
+        const room = state.rooms.find((r) => r.id === a.roomId);
+        return {
+          ...a,
+          roomName: room?.name ?? null,
+        };
+      });
+    },
+
+    async getRoomAsset(id: string) {
+      state.roomAssets ??= [];
+      const asset = state.roomAssets.find((a) => a.id === id);
+      if (!asset) return null;
+      const room = state.rooms.find((r) => r.id === asset.roomId);
+      return {
+        ...copy(asset),
+        roomName: room?.name ?? null,
+      };
+    },
+
+    async createRoomAsset(input) {
+      state.roomAssets ??= [];
+      const room = state.rooms.find((r) => r.id === input.roomId);
+      if (!room) {
+        throw new RepositoryError("not_found", "Room not found.");
+      }
+
+      const nowIso = new Date().toISOString();
+      const newAsset: RoomAsset = {
+        id: `asset-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        roomId: input.roomId,
+        roomName: room.name,
+        name: input.name.trim(),
+        assetTag: input.assetTag?.trim() || null,
+        category: input.category,
+        isMovable: input.isMovable,
+        condition: input.condition,
+        quantity: input.quantity,
+        serialNumber: input.serialNumber?.trim() || null,
+        modelNumber: input.modelNumber?.trim() || null,
+        notes: input.notes?.trim() || null,
+        isArchived: false,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      state.roomAssets.push(newAsset);
+      return copy(newAsset);
+    },
+
+    async updateRoomAsset(id: string, input) {
+      state.roomAssets ??= [];
+      const asset = state.roomAssets.find((a) => a.id === id);
+      if (!asset) return null;
+
+      if (input.roomId !== undefined) {
+        const room = state.rooms.find((r) => r.id === input.roomId);
+        if (!room) throw new RepositoryError("not_found", "Target room not found.");
+        asset.roomId = input.roomId;
+        asset.roomName = room.name;
+      }
+      if (input.name !== undefined) asset.name = input.name.trim();
+      if (input.assetTag !== undefined) asset.assetTag = input.assetTag?.trim() || null;
+      if (input.category !== undefined) asset.category = input.category;
+      if (input.isMovable !== undefined) asset.isMovable = input.isMovable;
+      if (input.condition !== undefined) asset.condition = input.condition;
+      if (input.quantity !== undefined) asset.quantity = input.quantity;
+      if (input.serialNumber !== undefined) asset.serialNumber = input.serialNumber?.trim() || null;
+      if (input.modelNumber !== undefined) asset.modelNumber = input.modelNumber?.trim() || null;
+      if (input.notes !== undefined) asset.notes = input.notes?.trim() || null;
+      if (input.isArchived !== undefined) asset.isArchived = input.isArchived;
+      asset.updatedAt = new Date().toISOString();
+
+      return copy(asset);
+    },
+
+    async archiveRoomAsset(id: string) {
+      state.roomAssets ??= [];
+      const asset = state.roomAssets.find((a) => a.id === id);
+      if (!asset) return false;
+      asset.isArchived = true;
+      asset.updatedAt = new Date().toISOString();
+      return true;
+    },
+
+    async moveRoomAsset(input) {
+      state.roomAssets ??= [];
+      state.assetMovements ??= [];
+
+      const asset = state.roomAssets.find((a) => a.id === input.assetId);
+      if (!asset) {
+        throw new RepositoryError("not_found", "Asset not found.");
+      }
+      if (!asset.isMovable) {
+        throw new RepositoryError("invalid", "Fixed assets cannot be moved between rooms.");
+      }
+
+      const fromRoom = state.rooms.find((r) => r.id === asset.roomId);
+      const toRoom = state.rooms.find((r) => r.id === input.toRoomId);
+      if (!toRoom) {
+        throw new RepositoryError("not_found", "Destination room not found.");
+      }
+      if (asset.roomId === input.toRoomId) {
+        throw new RepositoryError("invalid", "Asset is already in this room.");
+      }
+
+      const mover = state.users.find((u) => u.id === input.movedBy);
+      const fromRoomId = asset.roomId;
+      const fromRoomName = fromRoom?.name ?? "Previous Room";
+
+      // Update asset location
+      asset.roomId = input.toRoomId;
+      asset.roomName = toRoom.name;
+      asset.updatedAt = new Date().toISOString();
+
+      const movement: AssetMovement = {
+        id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        assetId: asset.id,
+        assetName: asset.name,
+        assetTag: asset.assetTag,
+        fromRoomId,
+        fromRoomName,
+        toRoomId: input.toRoomId,
+        toRoomName: toRoom.name,
+        movedBy: input.movedBy,
+        movedByName: mover?.fullName ?? "Staff Admin",
+        reason: input.reason?.trim() || null,
+        movedAt: new Date().toISOString(),
+      };
+
+      state.assetMovements.unshift(movement);
+      return copy(movement);
+    },
+
+    async listAssetMovements(options) {
+      state.assetMovements ??= [];
+      let movements = [...state.assetMovements];
+
+      if (options?.assetId) {
+        movements = movements.filter((m) => m.assetId === options.assetId);
+      }
+      if (options?.roomId) {
+        movements = movements.filter((m) => m.fromRoomId === options.roomId || m.toRoomId === options.roomId);
+      }
+
+      movements.sort((a, b) => new Date(b.movedAt).getTime() - new Date(a.movedAt).getTime());
+      return copy(movements);
     },
   };
 }

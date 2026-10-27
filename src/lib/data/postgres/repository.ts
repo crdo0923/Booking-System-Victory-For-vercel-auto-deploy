@@ -1,7 +1,7 @@
 import "server-only";
 import { asMember } from "@/lib/db/client";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type Repository } from "@/lib/data/repository";
-import type { AccessStatus, AnnouncementInput, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomLayout } from "@/lib/data/types";
+import type { AccessStatus, AnnouncementInput, InventoryItem, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomAsset, RoomLayout } from "@/lib/data/types";
 import { PAST_DUE_MESSAGE, type BookingStatus } from "@/lib/domain/booking-rules";
 import { INACTIVE_PROMOTION_MESSAGE, LAST_ADMIN_MESSAGE, OWN_ROLE_MESSAGE, SAME_ROLE_MESSAGE } from "@/lib/domain/roles";
 import {
@@ -17,6 +17,9 @@ import {
   toRoom,
   toUserSummary,
   toInventoryItem,
+  toInventoryTransaction,
+  toRoomAsset,
+  toAssetMovement,
   type AccessEventRow,
   type AnnouncementRow,
   type BookingDetailsRow,
@@ -26,6 +29,9 @@ import {
   type RescheduleRow,
   type RoomRow,
   type InventoryItemRow,
+  type InventoryTransactionRow,
+  type RoomAssetRow,
+  type AssetMovementRow,
 } from "@/lib/data/postgres/rows";
 
 /** Messages raised by database triggers/functions, mapped to user-facing text. */
@@ -960,6 +966,395 @@ export function createPostgresRepository(actorId: string | null): Repository {
         [id],
       );
       return rows.length > 0;
+    },
+
+    async recordInventoryTransaction(input) {
+      if (input.quantity <= 0) {
+        throw new RepositoryError("invalid", "Transaction quantity must be greater than zero.");
+      }
+
+      const item = await this.getInventoryItem(input.itemId);
+      if (!item) {
+        throw new RepositoryError("not_found", "Inventory item not found.");
+      }
+
+      const isStockIn = input.transactionType === "stock_in_restock";
+      let newBalance = item.currentStock;
+
+      if (isStockIn) {
+        newBalance += input.quantity;
+      } else {
+        if (item.currentStock < input.quantity) {
+          throw new RepositoryError(
+            "invalid",
+            `Cannot consume ${input.quantity} ${item.unit}. Only ${item.currentStock} in stock.`,
+          );
+        }
+        newBalance -= input.quantity;
+      }
+
+      // Update item balance
+      await query(
+        "updateItemBalance",
+        `update public.inventory_items
+         set current_stock = $2, updated_at = now()
+         where id = $1`,
+        [input.itemId, newBalance],
+      );
+
+      // Insert transaction record
+      const row = await first<InventoryTransactionRow>(
+        "recordInventoryTransaction",
+        `insert into public.inventory_transactions (
+           item_id, transaction_type, quantity, balance_after, room_id, booking_id,
+           recipient_or_ministry, notes, created_by
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         returning id, item_id, transaction_type, quantity, balance_after, room_id,
+                   booking_id, recipient_or_ministry, notes, created_by, created_at`,
+        [
+          input.itemId,
+          input.transactionType,
+          input.quantity,
+          newBalance,
+          input.roomId ?? null,
+          input.bookingId ?? null,
+          input.recipientOrMinistry?.trim() || null,
+          input.notes?.trim() || null,
+          input.createdBy,
+        ],
+      );
+
+      if (!row) {
+        throw new RepositoryError("unknown", "Could not record inventory transaction.");
+      }
+
+      const mapped = toInventoryTransaction(row);
+      mapped.itemName = item.name;
+      mapped.itemCategory = item.category;
+      mapped.itemUnit = item.unit;
+      return mapped;
+    },
+
+    async listInventoryTransactions(filter) {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+
+      if (filter?.itemId) {
+        values.push(filter.itemId);
+        conditions.push(`t.item_id = $${values.length}`);
+      }
+      if (filter?.roomId) {
+        values.push(filter.roomId);
+        conditions.push(`t.room_id = $${values.length}`);
+      }
+      if (filter?.type && filter.type !== "all") {
+        values.push(filter.type);
+        conditions.push(`t.transaction_type = $${values.length}`);
+      }
+      if (filter?.from) {
+        values.push(filter.from);
+        conditions.push(`t.created_at >= $${values.length}`);
+      }
+      if (filter?.to) {
+        values.push(filter.to);
+        conditions.push(`t.created_at <= $${values.length}`);
+      }
+
+      const whereClause = conditions.length > 0 ? `where ${conditions.join(" and ")}` : "";
+
+      const rows = await query<InventoryTransactionRow>(
+        "listInventoryTransactions",
+        `select t.id, t.item_id, t.transaction_type, t.quantity, t.balance_after,
+                t.room_id, t.booking_id, t.recipient_or_ministry, t.notes, t.created_by, t.created_at,
+                i.name as item_name, i.category as item_category, i.unit as item_unit,
+                r.name as room_name,
+                u.full_name as created_by_name
+         from public.inventory_transactions t
+         join public.inventory_items i on i.id = t.item_id
+         left join public.rooms r on r.id = t.room_id
+         left join public.profiles u on u.id = t.created_by
+         ${whereClause}
+         order by t.created_at desc`,
+        values,
+      );
+
+      return rows.map(toInventoryTransaction);
+    },
+
+    async getInventoryReportSummary() {
+      const items = await this.listInventoryItems(false);
+      const txs = await this.listInventoryTransactions();
+
+      let lowStockCount = 0;
+      let outOfStockCount = 0;
+      const activeWarnings: InventoryItem[] = [];
+
+      for (const item of items) {
+        if (item.currentStock <= 0) {
+          outOfStockCount++;
+          activeWarnings.push(item);
+        } else if (item.currentStock <= item.reorderThreshold) {
+          lowStockCount++;
+          activeWarnings.push(item);
+        }
+      }
+
+      let totalRestocked = 0;
+      let totalConsumed = 0;
+      const roomMap = new Map<string, { roomName: string; quantity: number }>();
+      const ministryMap = new Map<string, number>();
+
+      for (const tx of txs) {
+        if (tx.transactionType === "stock_in_restock") {
+          totalRestocked += tx.quantity;
+        } else {
+          totalConsumed += tx.quantity;
+          if (tx.roomId) {
+            const current = roomMap.get(tx.roomId) ?? { roomName: tx.roomName || "Room", quantity: 0 };
+            current.quantity += tx.quantity;
+            roomMap.set(tx.roomId, current);
+          }
+          if (tx.recipientOrMinistry) {
+            const current = ministryMap.get(tx.recipientOrMinistry) ?? 0;
+            ministryMap.set(tx.recipientOrMinistry, current + tx.quantity);
+          }
+        }
+      }
+
+      return {
+        totalItems: items.length,
+        lowStockItemsCount: lowStockCount,
+        outOfStockItemsCount: outOfStockCount,
+        totalRestockedQuantity: totalRestocked,
+        totalConsumedQuantity: totalConsumed,
+        consumedByRoom: Array.from(roomMap.entries()).map(([roomId, data]) => ({
+          roomId,
+          roomName: data.roomName,
+          quantity: data.quantity,
+        })),
+        consumedByMinistry: Array.from(ministryMap.entries()).map(([ministry, quantity]) => ({
+          ministry,
+          quantity,
+        })),
+        activeReorderWarnings: activeWarnings,
+      };
+    },
+
+    // Room Assets & Movement Tracking
+    async listRoomAssets(options) {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+
+      if (!options?.includeArchived) {
+        conditions.push(`a.is_archived = false`);
+      }
+      if (options?.roomId) {
+        values.push(options.roomId);
+        conditions.push(`a.room_id = $${values.length}`);
+      }
+      if (options?.isMovable !== undefined) {
+        values.push(options.isMovable);
+        conditions.push(`a.is_movable = $${values.length}`);
+      }
+
+      const whereClause = conditions.length > 0 ? `where ${conditions.join(" and ")}` : "";
+
+      const rows = await query<RoomAssetRow>(
+        "listRoomAssets",
+        `select a.id, a.room_id, a.name, a.asset_tag, a.category, a.is_movable,
+                a.condition, a.quantity, a.serial_number, a.model_number, a.notes,
+                a.is_archived, a.created_at, a.updated_at,
+                r.name as room_name
+         from public.room_assets a
+         join public.rooms r on r.id = a.room_id
+         ${whereClause}
+         order by a.name asc`,
+        values,
+      );
+
+      return rows.map(toRoomAsset);
+    },
+
+    async getRoomAsset(id: string) {
+      const row = await first<RoomAssetRow>(
+        "getRoomAsset",
+        `select a.id, a.room_id, a.name, a.asset_tag, a.category, a.is_movable,
+                a.condition, a.quantity, a.serial_number, a.model_number, a.notes,
+                a.is_archived, a.created_at, a.updated_at,
+                r.name as room_name
+         from public.room_assets a
+         join public.rooms r on r.id = a.room_id
+         where a.id = $1`,
+        [id],
+      );
+      return row ? toRoomAsset(row) : null;
+    },
+
+    async createRoomAsset(input) {
+      const row = await first<RoomAssetRow>(
+        "createRoomAsset",
+        `insert into public.room_assets (
+           room_id, name, asset_tag, category, is_movable, condition, quantity,
+           serial_number, model_number, notes, is_archived
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
+         returning id, room_id, name, asset_tag, category, is_movable, condition,
+                   quantity, serial_number, model_number, notes, is_archived, created_at, updated_at`,
+        [
+          input.roomId,
+          input.name,
+          input.assetTag?.trim() || null,
+          input.category,
+          input.isMovable,
+          input.condition,
+          input.quantity,
+          input.serialNumber?.trim() || null,
+          input.modelNumber?.trim() || null,
+          input.notes?.trim() || null,
+        ],
+      );
+
+      if (!row) {
+        throw new RepositoryError("unknown", "Could not create room asset.");
+      }
+
+      const asset = toRoomAsset(row);
+      const room = await this.getRoomById(input.roomId);
+      asset.roomName = room?.name ?? null;
+      return asset;
+    },
+
+    async updateRoomAsset(id: string, input) {
+      const current = await this.getRoomAsset(id);
+      if (!current) return null;
+
+      const roomId = input.roomId ?? current.roomId;
+      const name = input.name ?? current.name;
+      const assetTag = input.assetTag !== undefined ? (input.assetTag?.trim() || null) : current.assetTag;
+      const category = input.category ?? current.category;
+      const isMovable = input.isMovable !== undefined ? input.isMovable : current.isMovable;
+      const condition = input.condition ?? current.condition;
+      const quantity = input.quantity ?? current.quantity;
+      const serialNumber = input.serialNumber !== undefined ? (input.serialNumber?.trim() || null) : current.serialNumber;
+      const modelNumber = input.modelNumber !== undefined ? (input.modelNumber?.trim() || null) : current.modelNumber;
+      const notes = input.notes !== undefined ? (input.notes?.trim() || null) : current.notes;
+      const isArchived = input.isArchived !== undefined ? input.isArchived : current.isArchived;
+
+      const row = await first<RoomAssetRow>(
+        "updateRoomAsset",
+        `update public.room_assets
+         set room_id = $2,
+             name = $3,
+             asset_tag = $4,
+             category = $5,
+             is_movable = $6,
+             condition = $7,
+             quantity = $8,
+             serial_number = $9,
+             model_number = $10,
+             notes = $11,
+             is_archived = $12,
+             updated_at = now()
+         where id = $1
+         returning id, room_id, name, asset_tag, category, is_movable, condition,
+                   quantity, serial_number, model_number, notes, is_archived, created_at, updated_at`,
+        [id, roomId, name, assetTag, category, isMovable, condition, quantity, serialNumber, modelNumber, notes, isArchived],
+      );
+
+      return row ? toRoomAsset(row) : null;
+    },
+
+    async archiveRoomAsset(id: string) {
+      const rows = await query(
+        "archiveRoomAsset",
+        `update public.room_assets
+         set is_archived = true, updated_at = now()
+         where id = $1`,
+        [id],
+      );
+      return rows.length > 0;
+    },
+
+    async moveRoomAsset(input) {
+      const asset = await this.getRoomAsset(input.assetId);
+      if (!asset) {
+        throw new RepositoryError("not_found", "Asset not found.");
+      }
+      if (!asset.isMovable) {
+        throw new RepositoryError("invalid", "Fixed assets cannot be moved between rooms.");
+      }
+      if (asset.roomId === input.toRoomId) {
+        throw new RepositoryError("invalid", "Asset is already in this room.");
+      }
+
+      const toRoom = await this.getRoomById(input.toRoomId);
+      if (!toRoom) {
+        throw new RepositoryError("not_found", "Destination room not found.");
+      }
+
+      // Update asset's room
+      await query(
+        "updateAssetRoom",
+        `update public.room_assets
+         set room_id = $2, updated_at = now()
+         where id = $1`,
+        [input.assetId, input.toRoomId],
+      );
+
+      // Record movement
+      const row = await first<AssetMovementRow>(
+        "recordAssetMovement",
+        `insert into public.asset_movements (
+           asset_id, from_room_id, to_room_id, moved_by, reason
+         ) values ($1, $2, $3, $4, $5)
+         returning id, asset_id, from_room_id, to_room_id, moved_by, reason, moved_at`,
+        [input.assetId, asset.roomId, input.toRoomId, input.movedBy, input.reason?.trim() || null],
+      );
+
+      if (!row) {
+        throw new RepositoryError("unknown", "Could not record asset movement.");
+      }
+
+      const movement = toAssetMovement(row);
+      movement.assetName = asset.name;
+      movement.assetTag = asset.assetTag;
+      movement.fromRoomName = asset.roomName;
+      movement.toRoomName = toRoom.name;
+      return movement;
+    },
+
+    async listAssetMovements(options) {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+
+      if (options?.assetId) {
+        values.push(options.assetId);
+        conditions.push(`m.asset_id = $${values.length}`);
+      }
+      if (options?.roomId) {
+        values.push(options.roomId);
+        conditions.push(`(m.from_room_id = $${values.length} or m.to_room_id = $${values.length})`);
+      }
+
+      const whereClause = conditions.length > 0 ? `where ${conditions.join(" and ")}` : "";
+
+      const rows = await query<AssetMovementRow>(
+        "listAssetMovements",
+        `select m.id, m.asset_id, m.from_room_id, m.to_room_id, m.moved_by, m.reason, m.moved_at,
+                a.name as asset_name, a.asset_tag,
+                r_from.name as from_room_name,
+                r_to.name as to_room_name,
+                u.full_name as moved_by_name
+         from public.asset_movements m
+         join public.room_assets a on a.id = m.asset_id
+         join public.rooms r_from on r_from.id = m.from_room_id
+         join public.rooms r_to on r_to.id = m.to_room_id
+         left join public.profiles u on u.id = m.moved_by
+         ${whereClause}
+         order by m.moved_at desc`,
+        values,
+      );
+
+      return rows.map(toAssetMovement);
     },
   };
   return repo;

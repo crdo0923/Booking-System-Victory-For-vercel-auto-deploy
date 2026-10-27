@@ -27,7 +27,7 @@ export function AdminBookingEditForm({ booking, rooms, eventTypes, initialDate, 
     startTransition(async () => {
       const result = await editApprovedBookingAction(null, formData);
       setState(result);
-      if (result.ok) {
+      if (result?.ok) {
         toast.success(result.message);
         router.push(`/admin/bookings/${booking.id}`);
       }

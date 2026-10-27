@@ -38,3 +38,20 @@ export const getInventoryItems = cache(async (includeArchived?: boolean) =>
   (await getRepositoryForRequest()).listInventoryItems(includeArchived),
 );
 
+export const getInventoryTransactions = cache(async (filter?: import("@/lib/data/types").InventoryTransactionFilter) =>
+  (await getRepositoryForRequest()).listInventoryTransactions(filter),
+);
+
+export const getInventoryReportSummary = cache(async () =>
+  (await getRepositoryForRequest()).getInventoryReportSummary(),
+);
+
+export const getRoomAssets = cache(
+  async (options?: { roomId?: string; includeArchived?: boolean; isMovable?: boolean }) =>
+    (await getRepositoryForRequest()).listRoomAssets(options),
+);
+
+export const getAssetMovements = cache(async (options?: { assetId?: string; roomId?: string }) =>
+  (await getRepositoryForRequest()).listAssetMovements(options),
+);
+

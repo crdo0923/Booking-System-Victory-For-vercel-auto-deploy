@@ -5,7 +5,9 @@ import { failure, fieldErrorsFrom, success, type ServiceResult } from "@/lib/ser
 import {
   inventoryItemFieldsSchema,
   inventoryItemIdSchema,
+  inventoryTransactionSchema,
   type InventoryItemFields,
+  type InventoryTransactionFields,
 } from "@/lib/validation/inventory";
 
 export interface InventoryDeps {
@@ -136,5 +138,73 @@ export async function archiveInventoryItemService(
       return failure(error.code, error.message);
     }
     return failure("unknown", "Could not archive inventory item.");
+  }
+}
+
+export async function recordStockTransactionService(
+  formData: FormData,
+  actor: SessionUser | null,
+  deps: InventoryDeps,
+): Promise<ServiceResult<{ id: string }>> {
+  const denied = requireAdminActor(actor);
+  if (denied) return denied;
+
+  const rawFields = {
+    itemId: formData.get("itemId") ?? "",
+    transactionType: formData.get("transactionType") ?? "",
+    quantity: formData.get("quantity") ?? "",
+    roomId: formData.get("roomId") ?? undefined,
+    bookingId: formData.get("bookingId") ?? undefined,
+    recipientOrMinistry: formData.get("recipientOrMinistry") ?? undefined,
+    notes: formData.get("notes") ?? undefined,
+  };
+
+  const parsed = inventoryTransactionSchema.safeParse(rawFields);
+  if (!parsed.success) {
+    return failure("invalid", "Please check the transaction fields.", fieldErrorsFrom(parsed.error.issues));
+  }
+
+  try {
+    const tx = await deps.repo.recordInventoryTransaction({
+      itemId: parsed.data.itemId,
+      transactionType: parsed.data.transactionType,
+      quantity: parsed.data.quantity,
+      roomId: parsed.data.roomId,
+      bookingId: parsed.data.bookingId,
+      recipientOrMinistry: parsed.data.recipientOrMinistry,
+      notes: parsed.data.notes,
+      createdBy: actor!.id,
+    });
+
+    const isStockIn = parsed.data.transactionType === "stock_in_restock";
+    return success(
+      { id: tx.id },
+      isStockIn
+        ? `Successfully restocked ${tx.quantity} unit(s). New balance: ${tx.balanceAfter}.`
+        : `Successfully recorded consumption of ${tx.quantity} unit(s). Remaining balance: ${tx.balanceAfter}.`,
+    );
+  } catch (error) {
+    if (error instanceof RepositoryError) {
+      return failure(error.code, error.message);
+    }
+    return failure("unknown", "Could not record inventory movement. Please try again.");
+  }
+}
+
+export async function getInventoryReportsService(
+  actor: SessionUser | null,
+  deps: InventoryDeps,
+): Promise<ServiceResult<import("@/lib/data/types").InventoryReportSummary>> {
+  const denied = requireAdminActor(actor);
+  if (denied) return denied;
+
+  try {
+    const summary = await deps.repo.getInventoryReportSummary();
+    return success(summary, "Inventory report summary retrieved.");
+  } catch (error) {
+    if (error instanceof RepositoryError) {
+      return failure(error.code, error.message);
+    }
+    return failure("unknown", "Could not retrieve inventory report summary.");
   }
 }

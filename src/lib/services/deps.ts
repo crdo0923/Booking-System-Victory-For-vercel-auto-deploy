@@ -48,6 +48,13 @@ export async function getInventoryDeps(): Promise<InventoryDeps> {
   return { repo };
 }
 
+export type AssetDeps = InventoryDeps;
+
+export async function getAssetDeps(): Promise<AssetDeps> {
+  const repo = await getRepository();
+  return { repo };
+}
+
 /** Internal "pending review" GHL alerts, sent after the response so requests never wait for GHL. */
 export function getReviewAlerts(calendar: CalendarGateway): ReviewAlerts {
   return createReviewAlerts({

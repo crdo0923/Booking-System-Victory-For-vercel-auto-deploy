@@ -185,6 +185,20 @@ export interface Repository {
   createAnnouncement(input: AnnouncementInput, createdBy: string): Promise<Announcement>;
   updateAnnouncement(id: string, input: Partial<AnnouncementInput>): Promise<Announcement | null>;
   deleteAnnouncement(id: string): Promise<Announcement | null>;
+ 
+  // Inventory Transactions & Movements
+  recordInventoryTransaction(input: import("@/lib/data/types").CreateTransactionInput): Promise<import("@/lib/data/types").InventoryTransaction>;
+  listInventoryTransactions(filter?: import("@/lib/data/types").InventoryTransactionFilter): Promise<import("@/lib/data/types").InventoryTransaction[]>;
+  getInventoryReportSummary(): Promise<import("@/lib/data/types").InventoryReportSummary>;
+
+  // Room Assets & Movement Tracking
+  listRoomAssets(options?: { roomId?: string; includeArchived?: boolean; isMovable?: boolean }): Promise<import("@/lib/data/types").RoomAsset[]>;
+  getRoomAsset(id: string): Promise<import("@/lib/data/types").RoomAsset | null>;
+  createRoomAsset(input: import("@/lib/data/types").CreateRoomAssetInput): Promise<import("@/lib/data/types").RoomAsset>;
+  updateRoomAsset(id: string, input: import("@/lib/data/types").UpdateRoomAssetInput): Promise<import("@/lib/data/types").RoomAsset | null>;
+  archiveRoomAsset(id: string): Promise<boolean>;
+  moveRoomAsset(input: import("@/lib/data/types").MoveAssetInput): Promise<import("@/lib/data/types").AssetMovement>;
+  listAssetMovements(options?: { assetId?: string; roomId?: string }): Promise<import("@/lib/data/types").AssetMovement[]>;
 }
 
 /** Private object storage. Keys use the prefixes announcements/, rooms/ and maps/. */

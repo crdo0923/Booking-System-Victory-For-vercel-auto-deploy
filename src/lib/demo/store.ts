@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { TimeRange } from "@/lib/domain/availability";
-import type { AccessChange, AccessStatus, Announcement, Booking, InventoryItem, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, ShuttleRequest, RoomLayout } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, AssetMovement, Booking, InventoryItem, InventoryTransaction, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomAsset, RoomLayout, ShuttleRequest } from "@/lib/data/types";
 import { isProduction } from "@/lib/env";
 import { createDemoSeed } from "@/lib/demo/seed";
 
@@ -45,6 +45,9 @@ export interface DemoState {
   presets: LayoutPreset[];
   kioskDisplays: KioskDisplay[];
   inventoryItems: InventoryItem[];
+  inventoryTransactions: InventoryTransaction[];
+  roomAssets: RoomAsset[];
+  assetMovements: AssetMovement[];
   files: Map<string, { bytes: Uint8Array; contentType: string }>;
   /** Simulated GHL appointments, keyed by appointment id. */
   appointments: Map<string, { calendarId: string; range: TimeRange; title: string; assignedUserId: string; status: string }>;
@@ -76,5 +79,15 @@ export function getDemoState(): DemoState {
     throw new Error("Demo data is not available in production.");
   }
   globalForDemo.__victoryDemoState ??= createDemoSeed();
-  return globalForDemo.__victoryDemoState;
+  const state = globalForDemo.__victoryDemoState;
+  state.layouts ??= createDemoSeed().layouts;
+  state.presets ??= createDemoSeed().presets;
+  state.kioskDisplays ??= createDemoSeed().kioskDisplays;
+  state.inventoryItems ??= createDemoSeed().inventoryItems;
+  state.inventoryTransactions ??= createDemoSeed().inventoryTransactions;
+  state.roomAssets ??= createDemoSeed().roomAssets;
+  state.assetMovements ??= createDemoSeed().assetMovements;
+  state.shuttles ??= createDemoSeed().shuttles;
+  state.sessionSecret ??= getDemoSessionSecret();
+  return state;
 }
