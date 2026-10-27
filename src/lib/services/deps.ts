@@ -11,6 +11,7 @@ import { bookingFieldValues, type BookingServiceDeps } from "@/lib/services/book
 import { createReviewAlerts, type ReviewAlerts } from "@/lib/services/review-alerts";
 import type { CalendarGateway } from "@/lib/ghl/gateway";
 import type { CalendarSyncDeps } from "@/lib/services/calendar-sync";
+import type { Repository } from "@/lib/data/repository";
 
 export async function getBookingDeps(): Promise<BookingServiceDeps> {
   const [repo, calendar, google] = await Promise.all([getRepository(), getCalendarGateway(), getGoogleCalendar()]);
@@ -36,6 +37,15 @@ export type RoomDeps = AnnouncementDeps;
 
 export async function getRoomDeps(): Promise<RoomDeps> {
   return getAnnouncementDeps();
+}
+
+export interface InventoryDeps {
+  repo: Repository;
+}
+
+export async function getInventoryDeps(): Promise<InventoryDeps> {
+  const repo = await getRepository();
+  return { repo };
 }
 
 /** Internal "pending review" GHL alerts, sent after the response so requests never wait for GHL. */

@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { MAX_PENDING_PER_USER } from "@/lib/config";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type ImageStorage, type Repository } from "@/lib/data/repository";
-import type { AccessChange, AccessStatus, Announcement, Booking, BookingDetails, BookingWithRoom, Profile, RescheduleRequest, RescheduleStatus } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, Booking, BookingDetails, BookingWithRoom, InventoryItem, Profile, RescheduleRequest, RescheduleStatus } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 import { rangesOverlap, toRange } from "@/lib/domain/availability";
 import { isBlockingStatus, PAST_DUE_MESSAGE, validateBookingWindow } from "@/lib/domain/booking-rules";
@@ -708,6 +708,68 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       if (display) {
         display.lastSeenAt = new Date().toISOString();
       }
+    },
+
+    async listInventoryItems(includeArchived = false) {
+      state.inventoryItems ??= [];
+      return copy(
+        state.inventoryItems
+          .filter((item) => includeArchived || !item.isArchived)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      );
+    },
+
+    async getInventoryItem(id: string) {
+      state.inventoryItems ??= [];
+      const item = state.inventoryItems.find((i) => i.id === id);
+      return item ? copy(item) : null;
+    },
+
+    async createInventoryItem(input) {
+      state.inventoryItems ??= [];
+      const nowIso = new Date().toISOString();
+      const newItem: InventoryItem = {
+        id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: input.name.trim(),
+        category: input.category,
+        unit: input.unit,
+        currentStock: input.currentStock,
+        reorderThreshold: input.reorderThreshold,
+        unitCost: input.unitCost ?? null,
+        location: input.location.trim(),
+        isArchived: false,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      state.inventoryItems.push(newItem);
+      return copy(newItem);
+    },
+
+    async updateInventoryItem(id: string, input) {
+      state.inventoryItems ??= [];
+      const item = state.inventoryItems.find((i) => i.id === id);
+      if (!item) return null;
+
+      if (input.name !== undefined) item.name = input.name.trim();
+      if (input.category !== undefined) item.category = input.category;
+      if (input.unit !== undefined) item.unit = input.unit;
+      if (input.currentStock !== undefined) item.currentStock = input.currentStock;
+      if (input.reorderThreshold !== undefined) item.reorderThreshold = input.reorderThreshold;
+      if (input.unitCost !== undefined) item.unitCost = input.unitCost;
+      if (input.location !== undefined) item.location = input.location.trim();
+      if (input.isArchived !== undefined) item.isArchived = input.isArchived;
+      item.updatedAt = new Date().toISOString();
+
+      return copy(item);
+    },
+
+    async archiveInventoryItem(id: string) {
+      state.inventoryItems ??= [];
+      const item = state.inventoryItems.find((i) => i.id === id);
+      if (!item) return false;
+      item.isArchived = true;
+      item.updatedAt = new Date().toISOString();
+      return true;
     },
   };
 }

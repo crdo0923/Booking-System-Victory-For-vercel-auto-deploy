@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarPlus, DoorClosed, Home, LayoutGrid, ListChecks, Megaphone, Monitor, Users, type LucideIcon } from "lucide-react";
+import { CalendarPlus, DoorClosed, Home, LayoutGrid, ListChecks, Megaphone, Monitor, Package, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface NavItem {
   href: string;
   label: string;
-  icon: "home" | "book" | "bookings" | "overview" | "requests" | "rooms" | "users" | "announcements" | "displays";
+  icon: "home" | "book" | "bookings" | "overview" | "requests" | "rooms" | "users" | "announcements" | "displays" | "inventory";
   /** Match nested routes too (e.g. /rooms/room-a). */
   matchPrefix?: boolean;
   count?: number;
@@ -24,6 +24,7 @@ const icons: Record<NavItem["icon"], LucideIcon> = {
   users: Users,
   announcements: Megaphone,
   displays: Monitor,
+  inventory: Package,
 };
 
 function isActive(pathname: string, item: NavItem) {

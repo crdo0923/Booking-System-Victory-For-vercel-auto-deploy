@@ -22,6 +22,10 @@ import type {
   UpdateRoomInput,
   RoomLayout,
   UserSummary,
+  InventoryCategory,
+  InventoryItem,
+  CreateInventoryItemInput,
+  UpdateInventoryItemInput,
 } from "@/lib/data/types";
 
 export type RepositoryErrorCode = "conflict" | "duplicate" | "invalid" | "not_found" | "forbidden" | "unknown";
@@ -142,6 +146,13 @@ export interface Repository {
   createKioskDisplay(input: CreateKioskDisplayInput): Promise<KioskDisplay>;
   revokeKioskDisplay(id: string): Promise<boolean>;
   touchKioskDisplay(token: string): Promise<void>;
+
+  // Inventory Consumables Catalog methods
+  listInventoryItems(includeArchived?: boolean): Promise<InventoryItem[]>;
+  getInventoryItem(id: string): Promise<InventoryItem | null>;
+  createInventoryItem(input: CreateInventoryItemInput): Promise<InventoryItem>;
+  updateInventoryItem(id: string, input: UpdateInventoryItemInput): Promise<InventoryItem | null>;
+  archiveInventoryItem(id: string): Promise<boolean>;
 }
 
 /** Private object storage. Keys use the prefixes announcements/, rooms/ and maps/. */

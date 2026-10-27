@@ -34,3 +34,7 @@ export const getKioskDisplays = cache(async () => (await getRepositoryForRequest
 
 export const getKioskDisplayByToken = cache(async (token: string) => (await getRepositoryForRequest()).getKioskDisplayByToken(token));
 
+export const getInventoryItems = cache(async (includeArchived?: boolean) =>
+  (await getRepositoryForRequest()).listInventoryItems(includeArchived),
+);
+

@@ -289,4 +289,42 @@ export interface CreateKioskDisplayInput {
   label: string;
 }
 
+export type InventoryCategory = "communion" | "av_tech" | "hospitality" | "paper_office" | "cleaning";
+export type InventoryUnit = "pieces" | "boxes" | "packs" | "rolls" | "bottles";
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: InventoryCategory;
+  unit: InventoryUnit;
+  currentStock: number;
+  reorderThreshold: number;
+  unitCost?: number | null;
+  location: string;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInventoryItemInput {
+  name: string;
+  category: InventoryCategory;
+  unit: InventoryUnit;
+  currentStock: number;
+  reorderThreshold: number;
+  unitCost?: number | null;
+  location: string;
+}
+
+export interface UpdateInventoryItemInput {
+  name?: string;
+  category?: InventoryCategory;
+  unit?: InventoryUnit;
+  currentStock?: number;
+  reorderThreshold?: number;
+  unitCost?: number | null;
+  location?: string;
+  isArchived?: boolean;
+}
+
 

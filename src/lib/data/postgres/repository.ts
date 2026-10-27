@@ -16,6 +16,7 @@ import {
   toRescheduleRequest,
   toRoom,
   toUserSummary,
+  toInventoryItem,
   type AccessEventRow,
   type AnnouncementRow,
   type BookingDetailsRow,
@@ -24,6 +25,7 @@ import {
   type ProfileRow,
   type RescheduleRow,
   type RoomRow,
+  type InventoryItemRow,
 } from "@/lib/data/postgres/rows";
 
 /** Messages raised by database triggers/functions, mapped to user-facing text. */
@@ -812,6 +814,95 @@ export function createPostgresRepository(actorId: string | null): Repository {
       } catch {
         // Non-blocking telemetry
       }
+    },
+
+    async listInventoryItems(includeArchived = false) {
+      const rows = await query<InventoryItemRow>(
+        "listInventoryItems",
+        `select id, name, category, unit, current_stock, reorder_threshold, unit_cost, location, is_archived, created_at, updated_at
+         from public.inventory_items
+         where ($1 = true or is_archived = false)
+         order by name asc`,
+        [includeArchived],
+      );
+      return rows.map(toInventoryItem);
+    },
+
+    async getInventoryItem(id: string) {
+      const row = await first<InventoryItemRow>(
+        "getInventoryItem",
+        `select id, name, category, unit, current_stock, reorder_threshold, unit_cost, location, is_archived, created_at, updated_at
+         from public.inventory_items
+         where id = $1`,
+        [id],
+      );
+      return row ? toInventoryItem(row) : null;
+    },
+
+    async createInventoryItem(input) {
+      const row = await first<InventoryItemRow>(
+        "createInventoryItem",
+        `insert into public.inventory_items (
+           name, category, unit, current_stock, reorder_threshold, unit_cost, location, is_archived
+         ) values ($1, $2, $3, $4, $5, $6, $7, false)
+         returning id, name, category, unit, current_stock, reorder_threshold, unit_cost, location, is_archived, created_at, updated_at`,
+        [
+          input.name,
+          input.category,
+          input.unit,
+          input.currentStock,
+          input.reorderThreshold,
+          input.unitCost ?? null,
+          input.location,
+        ],
+      );
+      if (!row) {
+        throw new RepositoryError("unknown", "Could not create inventory item.");
+      }
+      return toInventoryItem(row);
+    },
+
+    async updateInventoryItem(id: string, input) {
+      const current = await this.getInventoryItem(id);
+      if (!current) return null;
+
+      const name = input.name ?? current.name;
+      const category = input.category ?? current.category;
+      const unit = input.unit ?? current.unit;
+      const currentStock = input.currentStock ?? current.currentStock;
+      const reorderThreshold = input.reorderThreshold ?? current.reorderThreshold;
+      const unitCost = input.unitCost !== undefined ? input.unitCost : current.unitCost;
+      const location = input.location ?? current.location;
+      const isArchived = input.isArchived !== undefined ? input.isArchived : current.isArchived;
+
+      const row = await first<InventoryItemRow>(
+        "updateInventoryItem",
+        `update public.inventory_items
+         set name = $2,
+             category = $3,
+             unit = $4,
+             current_stock = $5,
+             reorder_threshold = $6,
+             unit_cost = $7,
+             location = $8,
+             is_archived = $9,
+             updated_at = now()
+         where id = $1
+         returning id, name, category, unit, current_stock, reorder_threshold, unit_cost, location, is_archived, created_at, updated_at`,
+        [id, name, category, unit, currentStock, reorderThreshold, unitCost, location, isArchived],
+      );
+      return row ? toInventoryItem(row) : null;
+    },
+
+    async archiveInventoryItem(id: string) {
+      const rows = await query(
+        "archiveInventoryItem",
+        `update public.inventory_items
+         set is_archived = true, updated_at = now()
+         where id = $1`,
+        [id],
+      );
+      return rows.length > 0;
     },
   };
   return repo;

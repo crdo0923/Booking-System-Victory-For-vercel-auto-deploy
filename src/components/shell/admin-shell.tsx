@@ -22,6 +22,7 @@ export function AdminShell({ user, pendingBookings, pendingUsers, children }: Ad
     { href: "/admin", label: "Overview", icon: "overview" },
     { href: "/admin/bookings", label: "Booking requests", icon: "requests", matchPrefix: true, count: pendingBookings },
     { href: "/admin/rooms", label: "Rooms", icon: "rooms", matchPrefix: true },
+    { href: "/admin/inventory", label: "Inventory", icon: "inventory", matchPrefix: true },
     { href: "/admin/users", label: "Users", icon: "users", matchPrefix: true, count: pendingUsers },
     { href: "/admin/announcements", label: "Announcements", icon: "announcements", matchPrefix: true },
     { href: "/admin/displays", label: "Displays", icon: "displays", matchPrefix: true },

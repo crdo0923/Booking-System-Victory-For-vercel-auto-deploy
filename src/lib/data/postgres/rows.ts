@@ -13,6 +13,9 @@ import type {
   RoleChange,
   Room,
   UserSummary,
+  InventoryCategory,
+  InventoryItem,
+  InventoryUnit,
 } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 
@@ -308,3 +311,34 @@ export function toRescheduleRequest(row: RescheduleRow): RescheduleRequest {
     createdAt: iso(row.created_at),
   };
 }
+
+export interface InventoryItemRow {
+  id: string;
+  name: string;
+  category: InventoryCategory;
+  unit: InventoryUnit;
+  current_stock: number;
+  reorder_threshold: number;
+  unit_cost: number | string | null;
+  location: string;
+  is_archived: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export function toInventoryItem(row: InventoryItemRow): InventoryItem {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    unit: row.unit,
+    currentStock: Number(row.current_stock),
+    reorderThreshold: Number(row.reorder_threshold),
+    unitCost: row.unit_cost !== null && row.unit_cost !== undefined ? Number(row.unit_cost) : null,
+    location: row.location,
+    isArchived: Boolean(row.is_archived),
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+  };
+}
+
