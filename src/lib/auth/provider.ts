@@ -1,6 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
-import type { AccessStatus, Role } from "@/lib/data/types";
+import type { AccessStatus, Role, SystemRole } from "@/lib/data/types";
 import { getDataMode } from "@/lib/env";
 
 export interface SessionUser {
@@ -10,6 +10,7 @@ export interface SessionUser {
   phone: string | null;
   /** Always read from the database, never from client-provided state. */
   role: Role;
+  systemRole?: SystemRole;
   /** Only "active" accounts may use the portal; others see the waiting screen. */
   accessStatus: AccessStatus;
   accessReason: string | null;

@@ -88,6 +88,8 @@ describe("Audit Logging & Service Layer", () => {
     email: "admin@victory.test",
     role: "admin",
     accessStatus: "active",
+    phone: null,
+    accessReason: null,
   };
 
   const memberActor: SessionUser = {
@@ -96,6 +98,8 @@ describe("Audit Logging & Service Layer", () => {
     email: "member@victory.test",
     role: "user",
     accessStatus: "active",
+    phone: null,
+    accessReason: null,
   };
 
   it("records and queries audit events in the repository", async () => {

@@ -9,6 +9,8 @@ import { DemoBanner } from "@/components/shell/demo-banner";
 import { SkipLink } from "@/components/shell/member-shell";
 import { ScrollNav, SideNav, type NavItem } from "@/components/shell/nav-links";
 
+import { hasPermission } from "@/lib/domain/security-matrix";
+
 interface AdminShellProps {
   user: SessionUser;
   pendingBookings: number;
@@ -18,18 +20,24 @@ interface AdminShellProps {
 
 /** Operational shell: a compact sidebar on desktop, a top bar with scrolling nav below lg. */
 export function AdminShell({ user, pendingBookings, pendingUsers, children }: AdminShellProps) {
-  const nav: NavItem[] = [
+  const userSystemRole = user.systemRole || user.role;
+
+  const allNav: (NavItem & { capability?: import("@/lib/data/types").SecurityCapability })[] = [
     { href: "/admin", label: "Overview", icon: "overview" },
-    { href: "/admin/bookings", label: "Booking requests", icon: "requests", matchPrefix: true, count: pendingBookings },
-    { href: "/admin/rooms", label: "Rooms", icon: "rooms", matchPrefix: true },
-    { href: "/admin/assets", label: "Assets", icon: "assets", matchPrefix: true },
-    { href: "/admin/inventory", label: "Inventory", icon: "inventory", matchPrefix: true },
-    { href: "/admin/users", label: "Users", icon: "users", matchPrefix: true, count: pendingUsers },
-    { href: "/admin/announcements", label: "Announcements", icon: "announcements", matchPrefix: true },
+    { href: "/admin/bookings", label: "Booking requests", icon: "requests", matchPrefix: true, count: pendingBookings, capability: "bookings:approve" },
+    { href: "/admin/rooms", label: "Rooms", icon: "rooms", matchPrefix: true, capability: "rooms:view" },
+    { href: "/admin/assets", label: "Assets", icon: "assets", matchPrefix: true, capability: "assets:view" },
+    { href: "/admin/inventory", label: "Inventory", icon: "inventory", matchPrefix: true, capability: "inventory:view" },
+    { href: "/admin/users", label: "Users", icon: "users", matchPrefix: true, count: pendingUsers, capability: "users:view" },
+    { href: "/admin/announcements", label: "Announcements", icon: "announcements", matchPrefix: true, capability: "rooms:manage" },
     { href: "/admin/shuttles", label: "Shuttles", icon: "requests", matchPrefix: true },
-    { href: "/admin/displays", label: "Displays", icon: "displays", matchPrefix: true },
-    { href: "/admin/security", label: "Security & Audit", icon: "security", matchPrefix: true },
+    { href: "/admin/displays", label: "Displays", icon: "displays", matchPrefix: true, capability: "displays:view" },
+    { href: "/admin/security", label: "Security & Audit", icon: "security", matchPrefix: true, capability: "audit:view" },
   ];
+
+  const nav: NavItem[] = allNav.filter(
+    (item) => !item.capability || hasPermission(userSystemRole, item.capability),
+  );
 
   return (
     <>

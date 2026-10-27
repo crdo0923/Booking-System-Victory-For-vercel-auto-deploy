@@ -108,6 +108,16 @@ export async function resetPasswordAction(_prev: AuthFormState, formData: FormDa
   redirect("/login?reset=1");
 }
 
+export async function quickSignInAction(email: string, next?: string): Promise<{ error?: string }> {
+  const provider = await getAuthProvider();
+  // In demo mode or development, DEMO_PASSWORD is used.
+  const { DEMO_PASSWORD } = await import("@/lib/demo/seed");
+  const result = await provider.signIn(email, DEMO_PASSWORD);
+  if (!result.ok) return { error: result.error };
+
+  redirect(safeRedirectPath(next));
+}
+
 export async function signOutAction(): Promise<void> {
   const provider = await getAuthProvider();
   await provider.signOut();

@@ -13,6 +13,7 @@ export interface Profile {
   email: string;
   phone: string | null;
   role: Role;
+  systemRole?: SystemRole;
   accessStatus: AccessStatus;
   accessReason: string | null;
   accessReviewedAt: string | null;

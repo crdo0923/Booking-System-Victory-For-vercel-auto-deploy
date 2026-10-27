@@ -46,6 +46,7 @@ export function createDemoAuthProvider(): AuthProvider {
             fullName: user.fullName,
             phone: user.phone,
             role: user.role,
+            systemRole: user.systemRole,
             accessStatus: user.accessStatus,
             accessReason: user.accessReason,
           }

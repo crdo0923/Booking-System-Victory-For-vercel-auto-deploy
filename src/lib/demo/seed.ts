@@ -7,9 +7,54 @@ import { getDemoSessionSecret, type DemoState, type DemoUser } from "@/lib/demo/
 export const DEMO_PASSWORD = "victory-demo";
 
 export const DEMO_ACCOUNTS = {
-  admin: { email: "admin@victory.test", fullName: "Andrea Santos" },
-  member: { email: "member@victory.test", fullName: "Jamie Cruz" },
-  pending: { email: "pending@victory.test", fullName: "Lia Mendoza" },
+  admin: {
+    email: "admin@victory.test",
+    fullName: "Andrea Santos",
+    role: "admin",
+    systemRole: "admin",
+    label: "Administrator",
+    roleDescription: "Full access to rooms, bookings, inventory, displays, security matrix, and audit logs.",
+  },
+  facility_team: {
+    email: "facilities@victory.test",
+    fullName: "Bro. Dave (Facilities)",
+    role: "admin",
+    systemRole: "facility_team",
+    label: "Facility & AV Team",
+    roleDescription: "Manages room setups, furniture layouts, hardware assets, kiosk pairing, and supplies.",
+  },
+  pastoral_staff: {
+    email: "pastor.ricardo@victory.test",
+    fullName: "Pastor Ricardo",
+    role: "admin",
+    systemRole: "pastoral_staff",
+    label: "Pastoral & Ministry Staff",
+    roleDescription: "Reviews and approves room bookings, requests ministry supplies, and views schedules.",
+  },
+  member: {
+    email: "member@victory.test",
+    fullName: "Jamie Cruz",
+    role: "user",
+    systemRole: "member",
+    label: "Active Member / Leader",
+    roleDescription: "Requests room reservations, views approved schedules, and checks room facilities.",
+  },
+  guest: {
+    email: "guest@victory.test",
+    fullName: "Lia Mendoza (Guest)",
+    role: "user",
+    systemRole: "guest",
+    label: "Guest / Pending Account",
+    roleDescription: "New registration awaiting admin approval. Read-only preview of public announcements.",
+  },
+  pending: {
+    email: "pending@victory.test",
+    fullName: "Lia Mendoza",
+    role: "user",
+    systemRole: "guest",
+    label: "Pending Account",
+    roleDescription: "Account pending admin approval.",
+  },
 } as const;
 
 const ids = {
@@ -17,6 +62,9 @@ const ids = {
   member: "8f3c1a52-1b7e-4c1a-9a51-0a0000000002",
   memberTwo: "8f3c1a52-1b7e-4c1a-9a51-0a0000000003",
   pending: "8f3c1a52-1b7e-4c1a-9a51-0a0000000004",
+  facilityTeam: "8f3c1a52-1b7e-4c1a-9a51-0a0000000005",
+  pastoralStaff: "8f3c1a52-1b7e-4c1a-9a51-0a0000000006",
+  guest: "8f3c1a52-1b7e-4c1a-9a51-0a0000000007",
 };
 
 function room(index: number, fields: Omit<Room, "id" | "isActive" | "displayOrder" | "imagePath" | "mapImagePath" | "ghlCalendarId">): Room {
