@@ -4,6 +4,7 @@ import type { Room } from "@/lib/data/types";
 import { failure, fieldErrorsFrom, success, type ServiceResult } from "@/lib/services/result";
 import { safeImagePath, validateImageUpload } from "@/lib/storage/images";
 import { roomIdSchema, roomFieldsSchema } from "@/lib/validation/rooms";
+import { logAuditEvent } from "@/lib/services/audit";
 
 export interface RoomDeps {
   repo: Repository;
@@ -99,6 +100,23 @@ export async function createRoom(
       imagePath,
       ghlCalendarId: fields.data.ghlCalendarId,
     });
+
+    await logAuditEvent(deps.repo, {
+      actorId: actor?.id ?? null,
+      actorName: actor?.fullName ?? "Staff Admin",
+      actorEmail: actor?.email ?? null,
+      actorRole: actor?.role ?? "admin",
+      action: "room.created",
+      module: "rooms",
+      targetId: created.id,
+      details: {
+        name: created.name,
+        slug: created.slug,
+        capacity: created.capacity,
+        locationLabel: created.locationLabel,
+      },
+    });
+
     return success({ id: created.id, slug: created.slug }, "Room created successfully.");
   } catch (error) {
     if (error instanceof RepositoryError && error.code === "duplicate") {
@@ -184,6 +202,24 @@ export async function updateRoom(
       ...(imagePath ? { imagePath } : {}),
       ghlCalendarId: fields.data.ghlCalendarId,
     });
+
+    await logAuditEvent(deps.repo, {
+      actorId: actor?.id ?? null,
+      actorName: actor?.fullName ?? "Staff Admin",
+      actorEmail: actor?.email ?? null,
+      actorRole: actor?.role ?? "admin",
+      action: "room.updated",
+      module: "rooms",
+      targetId: idCheck.data.id,
+      details: {
+        name: fields.data.name,
+        slug: fields.data.slug,
+        capacity: fields.data.capacity,
+        customStatus: fields.data.customStatus,
+        airconHpTotal: fields.data.airconHpTotal,
+      },
+    });
+
     return success({ id: idCheck.data.id }, "Room updated successfully.");
   } catch (error) {
     if (error instanceof RepositoryError && error.code === "duplicate") {

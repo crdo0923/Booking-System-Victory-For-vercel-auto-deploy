@@ -2,6 +2,7 @@ import type { SessionUser } from "@/lib/auth/provider";
 import { RepositoryError, type Repository } from "@/lib/data/repository";
 import type { InventoryItem } from "@/lib/data/types";
 import { failure, fieldErrorsFrom, success, type ServiceResult } from "@/lib/services/result";
+import { logAuditEvent } from "@/lib/services/audit";
 import {
   inventoryItemFieldsSchema,
   inventoryItemIdSchema,
@@ -177,6 +178,25 @@ export async function recordStockTransactionService(
     });
 
     const isStockIn = parsed.data.transactionType === "stock_in_restock";
+
+    await logAuditEvent(deps.repo, {
+      actorId: actor?.id ?? null,
+      actorName: actor?.fullName ?? "Staff Admin",
+      actorEmail: actor?.email ?? null,
+      actorRole: actor?.role ?? "admin",
+      action: isStockIn ? "inventory.stock_in" : "inventory.stock_out",
+      module: "inventory",
+      targetId: tx.itemId,
+      details: {
+        itemName: tx.itemName,
+        quantity: tx.quantity,
+        transactionType: tx.transactionType,
+        balanceAfter: tx.balanceAfter,
+        roomName: tx.roomName,
+        recipientOrMinistry: tx.recipientOrMinistry,
+      },
+    });
+
     return success(
       { id: tx.id },
       isStockIn

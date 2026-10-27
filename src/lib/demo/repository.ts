@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { MAX_PENDING_PER_USER } from "@/lib/config";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type ImageStorage, type Repository } from "@/lib/data/repository";
-import type { AccessChange, AccessStatus, Announcement, AssetMovement, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, Profile, RescheduleRequest, RescheduleStatus, RoomAsset } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, AssetMovement, AuditLogEntry, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, Profile, RescheduleRequest, RescheduleStatus, RoomAsset } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 import { rangesOverlap, toRange } from "@/lib/domain/availability";
 import { isBlockingStatus, PAST_DUE_MESSAGE, validateBookingWindow } from "@/lib/domain/booking-rules";
@@ -1112,6 +1112,62 @@ export function createDemoRepository(actorId: string | null = null): Repository 
 
       movements.sort((a, b) => new Date(b.movedAt).getTime() - new Date(a.movedAt).getTime());
       return copy(movements);
+    },
+
+    async recordAuditLog(input) {
+      state.auditLogs ??= [];
+      const entry: AuditLogEntry = {
+        id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        actorId: input.actorId ?? null,
+        actorName: input.actorName,
+        actorEmail: input.actorEmail ?? null,
+        actorRole: input.actorRole,
+        action: input.action,
+        module: input.module,
+        targetId: input.targetId ?? null,
+        details: input.details ?? null,
+        ipAddress: input.ipAddress ?? null,
+        createdAt: new Date().toISOString(),
+      };
+      state.auditLogs.unshift(entry);
+      return copy(entry);
+    },
+
+    async listAuditLogs(filter) {
+      state.auditLogs ??= [];
+      let logs = [...state.auditLogs];
+
+      if (filter?.module && filter.module !== "all") {
+        logs = logs.filter((l) => l.module === filter.module);
+      }
+      if (filter?.action) {
+        const q = filter.action.toLowerCase();
+        logs = logs.filter((l) => l.action.toLowerCase().includes(q));
+      }
+      if (filter?.actor) {
+        const q = filter.actor.toLowerCase();
+        logs = logs.filter(
+          (l) => l.actorName.toLowerCase().includes(q) || (l.actorEmail && l.actorEmail.toLowerCase().includes(q)),
+        );
+      }
+      if (filter?.targetId) {
+        logs = logs.filter((l) => l.targetId === filter.targetId);
+      }
+      if (filter?.startDate) {
+        const start = new Date(filter.startDate).getTime();
+        logs = logs.filter((l) => new Date(l.createdAt).getTime() >= start);
+      }
+      if (filter?.endDate) {
+        const end = new Date(filter.endDate).getTime();
+        logs = logs.filter((l) => new Date(l.createdAt).getTime() <= end);
+      }
+
+      logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const offset = filter?.offset ?? 0;
+      const limit = Math.min(Math.max(filter?.limit ?? 100, 1), 500);
+
+      return copy(logs.slice(offset, offset + limit));
     },
   };
 }

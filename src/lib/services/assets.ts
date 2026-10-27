@@ -2,6 +2,7 @@ import type { SessionUser } from "@/lib/auth/provider";
 import { RepositoryError, type Repository } from "@/lib/data/repository";
 import type { AssetMovement, RoomAsset } from "@/lib/data/types";
 import { failure, fieldErrorsFrom, success, type ServiceResult } from "@/lib/services/result";
+import { logAuditEvent } from "@/lib/services/audit";
 import {
   moveAssetSchema,
   roomAssetFieldsSchema,
@@ -166,6 +167,24 @@ export async function moveRoomAssetService(
       movedBy: actor!.id,
       reason: parsed.data.reason,
     });
+
+    await logAuditEvent(deps.repo, {
+      actorId: actor?.id ?? null,
+      actorName: actor?.fullName ?? "Staff Admin",
+      actorEmail: actor?.email ?? null,
+      actorRole: actor?.role ?? "admin",
+      action: "asset.relocated",
+      module: "assets",
+      targetId: movement.assetId,
+      details: {
+        assetName: movement.assetName,
+        assetTag: movement.assetTag,
+        fromRoomName: movement.fromRoomName,
+        toRoomName: movement.toRoomName,
+        reason: movement.reason,
+      },
+    });
+
     return success(
       movement,
       `Transferred "${movement.assetName || "asset"}" to ${movement.toRoomName || "new room"}.`,

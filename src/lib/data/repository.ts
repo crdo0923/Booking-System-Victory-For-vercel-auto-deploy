@@ -199,6 +199,10 @@ export interface Repository {
   archiveRoomAsset(id: string): Promise<boolean>;
   moveRoomAsset(input: import("@/lib/data/types").MoveAssetInput): Promise<import("@/lib/data/types").AssetMovement>;
   listAssetMovements(options?: { assetId?: string; roomId?: string }): Promise<import("@/lib/data/types").AssetMovement[]>;
+
+  // Security & Audit Trail
+  recordAuditLog(input: import("@/lib/data/types").CreateAuditLogInput): Promise<import("@/lib/data/types").AuditLogEntry>;
+  listAuditLogs(filter?: import("@/lib/data/types").AuditLogFilter): Promise<import("@/lib/data/types").AuditLogEntry[]>;
 }
 
 /** Private object storage. Keys use the prefixes announcements/, rooms/ and maps/. */

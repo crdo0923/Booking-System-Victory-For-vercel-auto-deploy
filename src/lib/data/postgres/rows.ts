@@ -458,3 +458,34 @@ export function toAssetMovement(row: AssetMovementRow): AssetMovement {
   };
 }
 
+export interface AuditLogRow {
+  id: string;
+  actor_id: string | null;
+  actor_name: string;
+  actor_email: string | null;
+  actor_role: string;
+  action: string;
+  module: import("@/lib/data/types").SecurityModule;
+  target_id: string | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  created_at: Timestamp;
+}
+
+export function toAuditLogEntry(row: AuditLogRow): import("@/lib/data/types").AuditLogEntry {
+  return {
+    id: row.id,
+    actorId: row.actor_id,
+    actorName: row.actor_name,
+    actorEmail: row.actor_email,
+    actorRole: row.actor_role,
+    action: row.action,
+    module: row.module,
+    targetId: row.target_id,
+    details: row.details ?? null,
+    ipAddress: row.ip_address,
+    createdAt: iso(row.created_at),
+  };
+}
+
+

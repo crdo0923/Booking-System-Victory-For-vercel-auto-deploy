@@ -51,6 +51,11 @@ export const getRoomAssets = cache(
     (await getRepositoryForRequest()).listRoomAssets(options),
 );
 
+export const getAuditLogs = cache(
+  async (filter?: import("@/lib/data/types").AuditLogFilter) =>
+    (await getRepositoryForRequest()).listAuditLogs(filter),
+);
+
 export const getAssetMovements = cache(async (options?: { assetId?: string; roomId?: string }) =>
   (await getRepositoryForRequest()).listAssetMovements(options),
 );

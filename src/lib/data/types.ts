@@ -490,4 +490,104 @@ export interface MoveAssetInput {
   reason?: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Security & Audit Types
+// ---------------------------------------------------------------------------
+
+export type SystemRole = "admin" | "pastoral_staff" | "facility_team" | "member" | "guest";
+
+export type SecurityCapability =
+  // Rooms & Layouts
+  | "rooms:view"
+  | "rooms:manage"
+  | "layouts:view"
+  | "layouts:edit"
+  // Bookings
+  | "bookings:request"
+  | "bookings:approve"
+  | "bookings:override"
+  | "bookings:cancel_any"
+  // Inventory & Consumables
+  | "inventory:view"
+  | "inventory:stock_in"
+  | "inventory:stock_out"
+  | "inventory:manage"
+  // Room Assets
+  | "assets:view"
+  | "assets:relocate"
+  | "assets:manage"
+  // Kiosk & Tablet Displays
+  | "displays:view"
+  | "displays:pair"
+  | "displays:manage"
+  // Users & Access
+  | "users:view"
+  | "users:manage"
+  | "users:change_role"
+  // Security & Audit
+  | "audit:view"
+  | "security:manage";
+
+export type SecurityModule =
+  | "rooms"
+  | "layouts"
+  | "displays"
+  | "inventory"
+  | "assets"
+  | "bookings"
+  | "auth_users"
+  | "security";
+
+export interface PermissionDefinition {
+  capability: SecurityCapability;
+  label: string;
+  description: string;
+  module: SecurityModule;
+}
+
+export interface RolePermissionRow {
+  role: SystemRole;
+  roleLabel: string;
+  roleDescription: string;
+  capabilities: SecurityCapability[];
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actorId: string | null;
+  actorName: string;
+  actorEmail: string | null;
+  actorRole: string;
+  action: string;
+  module: SecurityModule;
+  targetId: string | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogFilter {
+  module?: SecurityModule | "all";
+  action?: string;
+  actor?: string;
+  targetId?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateAuditLogInput {
+  actorId?: string | null;
+  actorName: string;
+  actorEmail?: string | null;
+  actorRole: string;
+  action: string;
+  module: SecurityModule;
+  targetId?: string | null;
+  details?: Record<string, unknown> | null;
+  ipAddress?: string | null;
+}
+
+
 

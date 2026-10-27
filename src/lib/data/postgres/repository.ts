@@ -1356,6 +1356,86 @@ export function createPostgresRepository(actorId: string | null): Repository {
 
       return rows.map(toAssetMovement);
     },
+
+    async recordAuditLog(input) {
+      const row = await first<import("./rows").AuditLogRow>(
+        "recordAuditLog",
+        `insert into public.audit_logs (
+           actor_id, actor_name, actor_email, actor_role, action, module, target_id, details, ip_address
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         returning *`,
+        [
+          input.actorId ?? null,
+          input.actorName,
+          input.actorEmail ?? null,
+          input.actorRole,
+          input.action,
+          input.module,
+          input.targetId ?? null,
+          input.details ? JSON.stringify(input.details) : null,
+          input.ipAddress ?? null,
+        ],
+      );
+
+      if (!row) {
+        throw new RepositoryError("unknown", "Could not record audit log entry.");
+      }
+
+      return import("./rows").then((m) => m.toAuditLogEntry(row));
+    },
+
+    async listAuditLogs(filter) {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+
+      if (filter?.module && filter.module !== "all") {
+        values.push(filter.module);
+        conditions.push(`module = $${values.length}`);
+      }
+      if (filter?.action) {
+        values.push(`%${filter.action}%`);
+        conditions.push(`action ilike $${values.length}`);
+      }
+      if (filter?.actor) {
+        values.push(`%${filter.actor}%`);
+        conditions.push(`(actor_name ilike $${values.length} or actor_email ilike $${values.length})`);
+      }
+      if (filter?.targetId) {
+        values.push(filter.targetId);
+        conditions.push(`target_id = $${values.length}`);
+      }
+      if (filter?.startDate) {
+        values.push(filter.startDate);
+        conditions.push(`created_at >= $${values.length}`);
+      }
+      if (filter?.endDate) {
+        values.push(filter.endDate);
+        conditions.push(`created_at <= $${values.length}`);
+      }
+
+      const whereClause = conditions.length > 0 ? `where ${conditions.join(" and ")}` : "";
+      const limit = Math.min(Math.max(filter?.limit ?? 100, 1), 500);
+      values.push(limit);
+      const limitClause = `limit $${values.length}`;
+
+      let offsetClause = "";
+      if (filter?.offset && filter.offset > 0) {
+        values.push(filter.offset);
+        offsetClause = `offset $${values.length}`;
+      }
+
+      const rows = await query<import("./rows").AuditLogRow>(
+        "listAuditLogs",
+        `select * from public.audit_logs
+         ${whereClause}
+         order by created_at desc
+         ${limitClause} ${offsetClause}`,
+        values,
+      );
+
+      const { toAuditLogEntry } = await import("./rows");
+      return rows.map(toAuditLogEntry);
+    },
   };
   return repo;
 }

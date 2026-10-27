@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { TimeRange } from "@/lib/domain/availability";
-import type { AccessChange, AccessStatus, Announcement, AssetMovement, Booking, InventoryItem, InventoryTransaction, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomAsset, RoomLayout, ShuttleRequest } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, AssetMovement, AuditLogEntry, Booking, InventoryItem, InventoryTransaction, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomAsset, RoomLayout, ShuttleRequest } from "@/lib/data/types";
 import { isProduction } from "@/lib/env";
 import { createDemoSeed } from "@/lib/demo/seed";
 
@@ -48,6 +48,7 @@ export interface DemoState {
   inventoryTransactions: InventoryTransaction[];
   roomAssets: RoomAsset[];
   assetMovements: AssetMovement[];
+  auditLogs: AuditLogEntry[];
   files: Map<string, { bytes: Uint8Array; contentType: string }>;
   /** Simulated GHL appointments, keyed by appointment id. */
   appointments: Map<string, { calendarId: string; range: TimeRange; title: string; assignedUserId: string; status: string }>;
@@ -88,6 +89,7 @@ export function getDemoState(): DemoState {
   state.roomAssets ??= createDemoSeed().roomAssets;
   state.assetMovements ??= createDemoSeed().assetMovements;
   state.shuttles ??= createDemoSeed().shuttles;
+  state.auditLogs ??= createDemoSeed().auditLogs;
   state.sessionSecret ??= getDemoSessionSecret();
   return state;
 }
