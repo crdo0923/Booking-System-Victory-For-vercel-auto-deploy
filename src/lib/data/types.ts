@@ -382,4 +382,82 @@ export interface InventoryReportSummary {
   activeReorderWarnings: InventoryItem[];
 }
 
+export type AssetCategory =
+  | "av_production"
+  | "furniture"
+  | "instrument"
+  | "it_hardware"
+  | "appliance"
+  | "fixture"
+  | "other";
+
+export type AssetCondition = "excellent" | "good" | "fair" | "needs_repair" | "damaged";
+
+export interface RoomAsset {
+  id: string;
+  roomId: string;
+  roomName?: string | null;
+  name: string;
+  assetTag: string | null;
+  category: AssetCategory;
+  isMovable: boolean;
+  condition: AssetCondition;
+  quantity: number;
+  serialNumber?: string | null;
+  modelNumber?: string | null;
+  notes?: string | null;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRoomAssetInput {
+  roomId: string;
+  name: string;
+  assetTag?: string | null;
+  category: AssetCategory;
+  isMovable: boolean;
+  condition: AssetCondition;
+  quantity: number;
+  serialNumber?: string | null;
+  modelNumber?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdateRoomAssetInput {
+  roomId?: string;
+  name?: string;
+  assetTag?: string | null;
+  category?: AssetCategory;
+  isMovable?: boolean;
+  condition?: AssetCondition;
+  quantity?: number;
+  serialNumber?: string | null;
+  modelNumber?: string | null;
+  notes?: string | null;
+  isArchived?: boolean;
+}
+
+export interface AssetMovement {
+  id: string;
+  assetId: string;
+  assetName?: string | null;
+  assetTag?: string | null;
+  fromRoomId: string;
+  fromRoomName?: string | null;
+  toRoomId: string;
+  toRoomName?: string | null;
+  movedBy: string;
+  movedByName?: string | null;
+  reason?: string | null;
+  movedAt: string;
+}
+
+export interface MoveAssetInput {
+  assetId: string;
+  toRoomId: string;
+  movedBy: string;
+  reason?: string | null;
+}
+
 

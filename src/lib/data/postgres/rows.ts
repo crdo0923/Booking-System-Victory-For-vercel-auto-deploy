@@ -3,6 +3,9 @@ import type {
   AccessEvent,
   AccessStatus,
   Announcement,
+  AssetCategory,
+  AssetCondition,
+  AssetMovement,
   Booking,
   BookingDetails,
   BookingWithRoom,
@@ -12,6 +15,7 @@ import type {
   Role,
   RoleChange,
   Room,
+  RoomAsset,
   UserSummary,
   InventoryCategory,
   InventoryItem,
@@ -381,6 +385,76 @@ export function toInventoryTransaction(row: InventoryTransactionRow): InventoryT
     createdBy: row.created_by,
     createdByName: row.created_by_name ?? undefined,
     createdAt: iso(row.created_at),
+  };
+}
+
+export interface RoomAssetRow {
+  id: string;
+  room_id: string;
+  room_name?: string | null;
+  name: string;
+  asset_tag: string | null;
+  category: AssetCategory;
+  is_movable: boolean;
+  condition: AssetCondition;
+  quantity: number;
+  serial_number: string | null;
+  model_number: string | null;
+  notes: string | null;
+  is_archived: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export function toRoomAsset(row: RoomAssetRow): RoomAsset {
+  return {
+    id: row.id,
+    roomId: row.room_id,
+    roomName: row.room_name ?? null,
+    name: row.name,
+    assetTag: row.asset_tag,
+    category: row.category,
+    isMovable: Boolean(row.is_movable),
+    condition: row.condition,
+    quantity: Number(row.quantity),
+    serialNumber: row.serial_number,
+    modelNumber: row.model_number,
+    notes: row.notes,
+    isArchived: Boolean(row.is_archived),
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+  };
+}
+
+export interface AssetMovementRow {
+  id: string;
+  asset_id: string;
+  asset_name?: string | null;
+  asset_tag?: string | null;
+  from_room_id: string;
+  from_room_name?: string | null;
+  to_room_id: string;
+  to_room_name?: string | null;
+  moved_by: string;
+  moved_by_name?: string | null;
+  reason: string | null;
+  moved_at: Timestamp;
+}
+
+export function toAssetMovement(row: AssetMovementRow): AssetMovement {
+  return {
+    id: row.id,
+    assetId: row.asset_id,
+    assetName: row.asset_name ?? null,
+    assetTag: row.asset_tag ?? null,
+    fromRoomId: row.from_room_id,
+    fromRoomName: row.from_room_name ?? null,
+    toRoomId: row.to_room_id,
+    toRoomName: row.to_room_name ?? null,
+    movedBy: row.moved_by,
+    movedByName: row.moved_by_name ?? null,
+    reason: row.reason,
+    movedAt: iso(row.moved_at),
   };
 }
 

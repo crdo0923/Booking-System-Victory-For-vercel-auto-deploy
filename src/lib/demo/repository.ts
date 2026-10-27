@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { MAX_PENDING_PER_USER } from "@/lib/config";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type ImageStorage, type Repository } from "@/lib/data/repository";
-import type { AccessChange, AccessStatus, Announcement, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, Profile, RescheduleRequest, RescheduleStatus } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, AssetMovement, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, Profile, RescheduleRequest, RescheduleStatus, RoomAsset } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 import { rangesOverlap, toRange } from "@/lib/domain/availability";
 import { isBlockingStatus, PAST_DUE_MESSAGE, validateBookingWindow } from "@/lib/domain/booking-rules";
@@ -913,6 +913,170 @@ export function createDemoRepository(actorId: string | null = null): Repository 
         consumedByMinistry,
         activeReorderWarnings: copy(activeWarnings),
       };
+    },
+
+    // Room Assets & Movements
+    async listRoomAssets(options) {
+      state.roomAssets ??= [];
+      let assets = state.roomAssets;
+
+      if (!options?.includeArchived) {
+        assets = assets.filter((a) => !a.isArchived);
+      }
+      if (options?.roomId) {
+        assets = assets.filter((a) => a.roomId === options.roomId);
+      }
+      if (options?.isMovable !== undefined) {
+        assets = assets.filter((a) => a.isMovable === options.isMovable);
+      }
+
+      return copy(assets).map((a) => {
+        const room = state.rooms.find((r) => r.id === a.roomId);
+        return {
+          ...a,
+          roomName: room?.name ?? null,
+        };
+      });
+    },
+
+    async getRoomAsset(id: string) {
+      state.roomAssets ??= [];
+      const asset = state.roomAssets.find((a) => a.id === id);
+      if (!asset) return null;
+      const room = state.rooms.find((r) => r.id === asset.roomId);
+      return {
+        ...copy(asset),
+        roomName: room?.name ?? null,
+      };
+    },
+
+    async createRoomAsset(input) {
+      state.roomAssets ??= [];
+      const room = state.rooms.find((r) => r.id === input.roomId);
+      if (!room) {
+        throw new RepositoryError("not_found", "Room not found.");
+      }
+
+      const nowIso = new Date().toISOString();
+      const newAsset: RoomAsset = {
+        id: `asset-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        roomId: input.roomId,
+        roomName: room.name,
+        name: input.name.trim(),
+        assetTag: input.assetTag?.trim() || null,
+        category: input.category,
+        isMovable: input.isMovable,
+        condition: input.condition,
+        quantity: input.quantity,
+        serialNumber: input.serialNumber?.trim() || null,
+        modelNumber: input.modelNumber?.trim() || null,
+        notes: input.notes?.trim() || null,
+        isArchived: false,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      state.roomAssets.push(newAsset);
+      return copy(newAsset);
+    },
+
+    async updateRoomAsset(id: string, input) {
+      state.roomAssets ??= [];
+      const asset = state.roomAssets.find((a) => a.id === id);
+      if (!asset) return null;
+
+      if (input.roomId !== undefined) {
+        const room = state.rooms.find((r) => r.id === input.roomId);
+        if (!room) throw new RepositoryError("not_found", "Target room not found.");
+        asset.roomId = input.roomId;
+        asset.roomName = room.name;
+      }
+      if (input.name !== undefined) asset.name = input.name.trim();
+      if (input.assetTag !== undefined) asset.assetTag = input.assetTag?.trim() || null;
+      if (input.category !== undefined) asset.category = input.category;
+      if (input.isMovable !== undefined) asset.isMovable = input.isMovable;
+      if (input.condition !== undefined) asset.condition = input.condition;
+      if (input.quantity !== undefined) asset.quantity = input.quantity;
+      if (input.serialNumber !== undefined) asset.serialNumber = input.serialNumber?.trim() || null;
+      if (input.modelNumber !== undefined) asset.modelNumber = input.modelNumber?.trim() || null;
+      if (input.notes !== undefined) asset.notes = input.notes?.trim() || null;
+      if (input.isArchived !== undefined) asset.isArchived = input.isArchived;
+      asset.updatedAt = new Date().toISOString();
+
+      return copy(asset);
+    },
+
+    async archiveRoomAsset(id: string) {
+      state.roomAssets ??= [];
+      const asset = state.roomAssets.find((a) => a.id === id);
+      if (!asset) return false;
+      asset.isArchived = true;
+      asset.updatedAt = new Date().toISOString();
+      return true;
+    },
+
+    async moveRoomAsset(input) {
+      state.roomAssets ??= [];
+      state.assetMovements ??= [];
+
+      const asset = state.roomAssets.find((a) => a.id === input.assetId);
+      if (!asset) {
+        throw new RepositoryError("not_found", "Asset not found.");
+      }
+      if (!asset.isMovable) {
+        throw new RepositoryError("invalid", "Fixed assets cannot be moved between rooms.");
+      }
+
+      const fromRoom = state.rooms.find((r) => r.id === asset.roomId);
+      const toRoom = state.rooms.find((r) => r.id === input.toRoomId);
+      if (!toRoom) {
+        throw new RepositoryError("not_found", "Destination room not found.");
+      }
+      if (asset.roomId === input.toRoomId) {
+        throw new RepositoryError("invalid", "Asset is already in this room.");
+      }
+
+      const mover = state.users.find((u) => u.id === input.movedBy);
+      const fromRoomId = asset.roomId;
+      const fromRoomName = fromRoom?.name ?? "Previous Room";
+
+      // Update asset location
+      asset.roomId = input.toRoomId;
+      asset.roomName = toRoom.name;
+      asset.updatedAt = new Date().toISOString();
+
+      const movement: AssetMovement = {
+        id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        assetId: asset.id,
+        assetName: asset.name,
+        assetTag: asset.assetTag,
+        fromRoomId,
+        fromRoomName,
+        toRoomId: input.toRoomId,
+        toRoomName: toRoom.name,
+        movedBy: input.movedBy,
+        movedByName: mover?.fullName ?? "Staff Admin",
+        reason: input.reason?.trim() || null,
+        movedAt: new Date().toISOString(),
+      };
+
+      state.assetMovements.unshift(movement);
+      return copy(movement);
+    },
+
+    async listAssetMovements(options) {
+      state.assetMovements ??= [];
+      let movements = [...state.assetMovements];
+
+      if (options?.assetId) {
+        movements = movements.filter((m) => m.assetId === options.assetId);
+      }
+      if (options?.roomId) {
+        movements = movements.filter((m) => m.fromRoomId === options.roomId || m.toRoomId === options.roomId);
+      }
+
+      movements.sort((a, b) => new Date(b.movedAt).getTime() - new Date(a.movedAt).getTime());
+      return copy(movements);
     },
   };
 }

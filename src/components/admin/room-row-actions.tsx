@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, ExternalLink, LayoutGrid, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, ExternalLink, LayoutGrid, Pencil, ShieldCheck } from "lucide-react";
 import { toggleArchiveRoomAction } from "@/app/actions/rooms";
 import type { Room } from "@/lib/data/types";
 import { Dialog } from "@/components/ui/dialog";
@@ -45,6 +45,15 @@ export function RoomRowActions({ room }: { room: Room & { imageUrl: string | nul
         >
           <LayoutGrid className="size-4" />
           <span className="sr-only">Layout Editor {room.name}</span>
+        </Link>
+
+        <Link
+          href={`/admin/assets?roomId=${room.id}`}
+          className="flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-fill-quiet hover:text-ink"
+          title="View & manage room assets"
+        >
+          <ShieldCheck className="size-4" />
+          <span className="sr-only">Assets in {room.name}</span>
         </Link>
 
         <button

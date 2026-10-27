@@ -15,12 +15,12 @@ interface StockMovementLedgerProps {
 
 const TYPE_CONFIG: Record<
   InventoryTransactionType,
-  { label: string; isStockIn: boolean; tone: "emerald" | "amber" | "neutral" }
+  { label: string; isStockIn: boolean }
 > = {
-  stock_in_restock: { label: "Restock In", isStockIn: true, tone: "emerald" },
-  stock_out_ministry: { label: "Ministry Out", isStockIn: false, tone: "amber" },
-  stock_out_booking: { label: "Booking Out", isStockIn: false, tone: "amber" },
-  adjustment_loss_waste: { label: "Waste / Loss", isStockIn: false, tone: "neutral" },
+  stock_in_restock: { label: "Restock In", isStockIn: true },
+  stock_out_ministry: { label: "Ministry Out", isStockIn: false },
+  stock_out_booking: { label: "Booking Out", isStockIn: false },
+  adjustment_loss_waste: { label: "Waste / Loss", isStockIn: false },
 };
 
 export function StockMovementLedger({
@@ -162,22 +162,13 @@ export function StockMovementLedger({
 
                     {/* Movement Type */}
                     <td className="py-3 px-4">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded border",
-                          conf.isStockIn
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-                            : conf.tone === "amber"
-                              ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-300"
-                              : "border-stone-200 bg-stone-50 text-stone-700 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300",
-                        )}
-                      >
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink">
                         {conf.isStockIn ? (
-                          <ArrowDownLeft className="size-3" />
+                          <ArrowDownLeft className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                         ) : (
-                          <ArrowUpRight className="size-3" />
+                          <ArrowUpRight className="size-3.5 text-amber-600 dark:text-amber-400" />
                         )}
-                        {conf.label}
+                        <span>{conf.label}</span>
                       </span>
                     </td>
 
