@@ -975,7 +975,7 @@ export function createDemoSeed(): DemoState {
     appointments: new Map(),
     ghlContacts: new Map(),
     // The seeded member has already connected Google Calendar; new accounts have not.
-    googleConnections: new Set([ids.member]),
+    googleConnections: new Set([ids.admin, ids.member, ids.memberTwo]),
     googleEvents: new Map(),
     sessionSecret: getDemoSessionSecret(),
   };

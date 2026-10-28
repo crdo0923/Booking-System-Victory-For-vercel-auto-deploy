@@ -153,6 +153,9 @@ export function createDemoRepository(actorId: string | null = null): Repository 
         accessReviewedAt: now,
         accessNotificationError: null,
       });
+      if (status === "active") {
+        state.googleConnections.add(userId);
+      }
       state.accessEvents.push({
         id: randomUUID(),
         userId,

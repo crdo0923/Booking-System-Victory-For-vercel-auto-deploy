@@ -77,6 +77,9 @@ export function createDemoAuthProvider(): AuthProvider {
             createdAt: nowIso,
           };
           state.users.push(newUser);
+          if (newUser.accessStatus === "active") {
+            state.googleConnections.add(newUser.id);
+          }
           user = newUser;
         }
       }
