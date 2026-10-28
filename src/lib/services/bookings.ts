@@ -201,6 +201,28 @@ export async function createBookingRequest(
       source: origin.source,
       whatsappMessageId: origin.whatsappMessageId ?? null,
     });
+    if (input.itemRequests) {
+      try {
+        const requests = JSON.parse(input.itemRequests) as unknown;
+        if (!Array.isArray(requests) || requests.length > 20) return failure("invalid", "Choose up to 20 room setup items.");
+        const clean = requests.map((request) => {
+          if (!request || typeof request !== "object") throw new Error("invalid item");
+          const item = request as { itemId?: unknown; quantity?: unknown; notes?: unknown };
+          if (typeof item.itemId !== "string" || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) throw new Error("invalid item");
+          if (item.itemId === "other") {
+            if (typeof item.notes !== "string" || item.notes.trim().length < 2 || item.notes.trim().length > 200) throw new Error("custom description");
+            return { itemId: null, quantity: item.quantity, notes: item.notes.trim() };
+          }
+          if (item.notes !== undefined && item.notes !== null) throw new Error("invalid item");
+          return { itemId: item.itemId, quantity: item.quantity, notes: null };
+        });
+        if (clean.length) await deps.repo.createItemRequests(booking.id, clean);
+      } catch (error) {
+        return failure("invalid", error instanceof Error && error.message === "custom description"
+          ? "Describe your custom item in 2–200 characters."
+          : "One or more requested items could not be read.");
+      }
+    }
     if (deps.reviewAlerts) {
       const alerts = deps.reviewAlerts;
       queueReviewAlert(() =>

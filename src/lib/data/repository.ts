@@ -26,6 +26,9 @@ import type {
   ShuttleRequestDetails,
   InventoryCategory,
   InventoryItem,
+  ItemRequest,
+  ItemRequestHistory,
+  ItemRequestStatus,
   CreateInventoryItemInput,
   UpdateInventoryItemInput,
 } from "@/lib/data/types";
@@ -94,6 +97,12 @@ export interface Repository {
   createInventoryItem(input: CreateInventoryItemInput): Promise<InventoryItem>;
   updateInventoryItem(id: string, input: UpdateInventoryItemInput): Promise<InventoryItem | null>;
   archiveInventoryItem(id: string): Promise<boolean>;
+  createItemRequests(bookingId: string, requests: Array<{ itemId: string | null; quantity: number; notes?: string | null }>): Promise<ItemRequest[]>;
+  listItemRequestsForBooking(bookingId: string): Promise<ItemRequest[]>;
+  listItemRequestsForUser(userId: string): Promise<ItemRequest[]>;
+  listItemRequests(status?: ItemRequestStatus): Promise<ItemRequest[]>;
+  listItemRequestHistory(requestId: string): Promise<ItemRequestHistory[]>;
+  updateItemRequestStatus(id: string, status: Exclude<ItemRequestStatus, "submitted">, note?: string | null): Promise<ItemRequest | null>;
 
   /**
    * Periods a room is taken, without requester details: pending and approved

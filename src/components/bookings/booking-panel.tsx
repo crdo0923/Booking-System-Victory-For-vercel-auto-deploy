@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarCheck2 } from "lucide-react";
+import type { InventoryItem } from "@/lib/data/types";
 import { requestBookingAction, type BookingActionState } from "@/app/actions/bookings";
 import { requestRescheduleAction, type RescheduleActionState } from "@/app/actions/reschedules";
 import { EVENT_TYPES } from "@/lib/config";
@@ -30,6 +31,7 @@ interface BookingPanelProps {
   returnTo: string;
   /** Reschedule mode: pick a new time for an existing approved booking in the same room. */
   reschedule?: { bookingId: string; durationMinutes: number; currentLabel: string };
+  inventoryItems?: InventoryItem[];
 }
 
 function durationLabel(start: string, end: string): string {
@@ -40,13 +42,14 @@ function durationLabel(start: string, end: string): string {
 }
 
 export function BookingPanel(props: BookingPanelProps) {
-  const { roomId, roomName, capacity, dateKey, dateLabel, slots, problem, maxMinutes, googleRequired, googleConnected, returnTo, reschedule } = props;
+  const { roomId, roomName, capacity, dateKey, dateLabel, slots, problem, maxMinutes, googleRequired, googleConnected, returnTo, reschedule, inventoryItems = [] } = props;
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
   const [selectedStart, setSelectedStart] = useState<string | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<string | null>(null);
   const [state, setState] = useState<BookingActionState | RescheduleActionState>(null);
   const [pending, startTransition] = useTransition();
+  const [requestedItems, setRequestedItems] = useState<Array<{ itemId: string; quantity: string; notes: string }>>([{ itemId: "", quantity: "", notes: "" }]);
 
   const segments = useMemo(() => groupIntoSegments(slots).filter((segment) => segment.status !== "past"), [slots]);
   const hasPast = slots.some((slot) => slot.status === "past");
@@ -318,6 +321,32 @@ export function BookingPanel(props: BookingPanelProps) {
                   <Field id="purpose" label="Purpose" error={errors.purpose} hint={purposeHint}>
                     <Textarea id="purpose" name="purpose" maxLength={1000} rows={3} required aria-invalid={Boolean(errors.purpose)} aria-describedby={describedBy("purpose", errors.purpose, purposeHint)} />
                   </Field>
+                  {inventoryItems.length > 0 && (
+                    <fieldset className="space-y-2 border-t border-line pt-4">
+                      <legend className="text-sm font-extrabold">Room setup items <span className="font-normal text-muted">(optional)</span></legend>
+                      <p className="text-xs text-muted">Requests are reviewed separately by the facilities team.</p>
+                      {requestedItems.map((request, index) => {
+                        const selected = inventoryItems.find((item) => item.id === request.itemId);
+                        return (
+                          <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_6rem_auto]">
+                            <Select aria-label={`Room setup item ${index + 1}`} value={request.itemId} onChange={(event) => {
+                              const itemId = event.target.value;
+                              setRequestedItems((current) => current.map((item, row) => row === index ? { ...item, itemId, notes: itemId === "other" ? item.notes : "" } : item));
+                            }}>
+                              <option value="">Choose an item…</option>
+                              {inventoryItems.slice(0, 12).map((item) => <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>)}
+                              <option value="other">Other (describe below)</option>
+                            </Select>
+                            <Input type="number" min={1} max={999} inputMode="numeric" placeholder="Qty" aria-label={`Quantity for item ${index + 1}`} value={request.quantity} onChange={(event) => setRequestedItems((current) => current.map((item, row) => row === index ? { ...item, quantity: event.target.value } : item))} />
+                            {requestedItems.length > 1 ? <button type="button" className="text-xs font-bold text-muted underline" onClick={() => setRequestedItems((current) => current.filter((_, row) => row !== index))}>Remove</button> : <span />}
+                            {selected === undefined && request.itemId === "other" && <Input className="sm:col-span-3" maxLength={200} placeholder="Describe the item" aria-label={`Custom item description ${index + 1}`} value={request.notes} onChange={(event) => setRequestedItems((current) => current.map((item, row) => row === index ? { ...item, notes: event.target.value } : item))} />}
+                          </div>
+                        );
+                      })}
+                      <button type="button" className="text-sm font-bold underline" onClick={() => setRequestedItems((current) => [...current, { itemId: "", quantity: "", notes: "" }])}>+ Add another item</button>
+                      <input type="hidden" name="itemRequests" value={JSON.stringify(requestedItems.filter((request) => request.itemId && request.quantity).map(({ itemId, quantity, notes }) => ({ itemId, quantity: Number(quantity), ...(itemId === "other" ? { notes } : {}) })))} />
+                    </fieldset>
+                  )}
                 </>
               )}
 

@@ -17,7 +17,7 @@ export type BookingActionState = ServiceResult<{ bookingId: string }> | null;
 export type ReviewActionState = ServiceResult<DenialResult> | null;
 export type AdminEditActionState = ServiceResult<AdminEditResult> | null;
 
-const BOOKING_FIELDS = ["roomId", "date", "startTime", "endTime", "eventName", "eventType", "attendeeCount", "purpose"] as const;
+const BOOKING_FIELDS = ["roomId", "date", "startTime", "endTime", "eventName", "eventType", "attendeeCount", "purpose", "itemRequests"] as const;
 
 /** Missing server configuration becomes a clear message instead of an unhandled error. */
 async function withConfig<T>(run: () => Promise<ServiceResult<T>>): Promise<ServiceResult<T>> {

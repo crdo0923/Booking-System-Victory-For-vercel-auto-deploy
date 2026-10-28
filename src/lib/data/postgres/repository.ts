@@ -1,7 +1,7 @@
 import "server-only";
 import { asMember } from "@/lib/db/client";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type Repository } from "@/lib/data/repository";
-import type { AccessStatus, AnnouncementInput, InventoryItem, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomAsset, RoomLayout } from "@/lib/data/types";
+import type { AccessStatus, AnnouncementInput, InventoryItem, ItemRequestStatus, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomAsset, RoomLayout } from "@/lib/data/types";
 import { PAST_DUE_MESSAGE, type BookingStatus } from "@/lib/domain/booking-rules";
 import { INACTIVE_PROMOTION_MESSAGE, LAST_ADMIN_MESSAGE, OWN_ROLE_MESSAGE, SAME_ROLE_MESSAGE } from "@/lib/domain/roles";
 import {
@@ -18,6 +18,8 @@ import {
   toUserSummary,
   toInventoryItem,
   toInventoryTransaction,
+  toItemRequest,
+  toItemRequestHistory,
   toRoomAsset,
   toAssetMovement,
   type AccessEventRow,
@@ -30,6 +32,8 @@ import {
   type RoomRow,
   type InventoryItemRow,
   type InventoryTransactionRow,
+  type ItemRequestRow,
+  type ItemRequestHistoryRow,
   type RoomAssetRow,
   type AssetMovementRow,
 } from "@/lib/data/postgres/rows";
@@ -966,6 +970,57 @@ export function createPostgresRepository(actorId: string | null): Repository {
         [id],
       );
       return rows.length > 0;
+    },
+
+    async createItemRequests(bookingId, requests) {
+      if (!requests.length) return [];
+      const results = [];
+      for (const request of requests) {
+        const row = await first<ItemRequestRow>("createItemRequest", `insert into public.item_requests (booking_id, item_id, quantity, notes)
+          values ($1,$2,$3,$4)
+          returning id, booking_id, item_id, coalesce((select name from public.inventory_items where id=item_id), notes, 'Other') as item_name,
+                    coalesce((select unit from public.inventory_items where id=item_id), 'pieces') as item_unit, quantity, notes, status,
+                    reviewed_by, reviewed_at, created_at, updated_at`, [bookingId, request.itemId, request.quantity, request.notes ?? null]);
+        if (row) results.push(toItemRequest(row));
+      }
+      return results;
+    },
+
+    async listItemRequestsForBooking(bookingId) {
+      const rows = await query<ItemRequestRow>("listItemRequestsForBooking", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
+        from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
+        where r.booking_id=$1 order by r.created_at asc`, [bookingId]);
+      return rows.map(toItemRequest);
+    },
+    async listItemRequestsForUser(userId) {
+      const rows = await query<ItemRequestRow>("listItemRequestsForUser", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
+        from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
+        join public.bookings b on b.id=r.booking_id where b.user_id=$1 order by r.created_at desc`, [userId]);
+      return rows.map(toItemRequest);
+    },
+    async listItemRequests(status?: ItemRequestStatus) {
+      const rows = await query<ItemRequestRow>("listItemRequests", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
+        from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
+        where ($1::text is null or r.status=$1) order by r.created_at desc`, [status ?? null]);
+      return rows.map(toItemRequest);
+    },
+    async listItemRequestHistory(requestId) {
+      const rows = await query<ItemRequestHistoryRow>("listItemRequestHistory", `select h.*, p.full_name as changed_by_name
+        from public.item_request_history h left join public.profiles p on p.id=h.changed_by
+        where h.item_request_id=$1 order by h.created_at desc`, [requestId]);
+      return rows.map(toItemRequestHistory);
+    },
+    async updateItemRequestStatus(id, status, note) {
+      try {
+        const row = await first<ItemRequestRow>("updateItemRequestStatus", `select * from public.record_item_request_status($1,$2,$3)`, [id, status, note ?? null]);
+        if (!row) return null;
+        const full = await first<ItemRequestRow>("reloadItemRequest", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
+          from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by where r.id=$1`, [id]);
+        return full ? toItemRequest(full) : toItemRequest(row);
+      } catch (error) {
+        if (error instanceof Error && /forbidden/i.test(error.message)) throw new RepositoryError("forbidden", "Only administrators can update item requests.");
+        throw new RepositoryError("invalid", error instanceof Error ? error.message : "Could not update item request.");
+      }
     },
 
     async recordInventoryTransaction(input) {

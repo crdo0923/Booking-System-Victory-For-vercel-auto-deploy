@@ -22,6 +22,9 @@ import type {
   InventoryTransaction,
   InventoryTransactionType,
   InventoryUnit,
+  ItemRequest,
+  ItemRequestHistory,
+  ItemRequestStatus,
 } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 
@@ -388,6 +391,25 @@ export function toInventoryTransaction(row: InventoryTransactionRow): InventoryT
   };
 }
 
+export interface ItemRequestRow {
+  id: string; booking_id: string; item_id: string | null; item_name: string; item_unit: InventoryUnit;
+  quantity: number; notes: string | null; status: ItemRequestStatus; reviewed_by: string | null;
+  reviewer_name?: string | null; reviewed_at: Timestamp | null; created_at: Timestamp; updated_at: Timestamp;
+}
+export function toItemRequest(row: ItemRequestRow): ItemRequest {
+  return { id: row.id, bookingId: row.booking_id, itemId: row.item_id, itemName: row.item_name, itemUnit: row.item_unit,
+    quantity: Number(row.quantity), notes: row.notes, status: row.status, reviewedBy: row.reviewed_by,
+    reviewerName: row.reviewer_name ?? null, reviewedAt: isoOrNull(row.reviewed_at), createdAt: iso(row.created_at), updatedAt: iso(row.updated_at) };
+}
+export interface ItemRequestHistoryRow {
+  id: string; item_request_id: string; from_status: ItemRequestStatus | null; to_status: ItemRequestStatus;
+  changed_by: string | null; changed_by_name?: string | null; note: string | null; created_at: Timestamp;
+}
+export function toItemRequestHistory(row: ItemRequestHistoryRow): ItemRequestHistory {
+  return { id: row.id, itemRequestId: row.item_request_id, fromStatus: row.from_status, toStatus: row.to_status,
+    changedBy: row.changed_by, changedByName: row.changed_by_name ?? null, note: row.note, createdAt: iso(row.created_at) };
+}
+
 export interface RoomAssetRow {
   id: string;
   room_id: string;
@@ -487,5 +509,3 @@ export function toAuditLogEntry(row: AuditLogRow): import("@/lib/data/types").Au
     createdAt: iso(row.created_at),
   };
 }
-
-

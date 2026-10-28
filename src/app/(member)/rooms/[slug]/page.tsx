@@ -7,7 +7,7 @@ import { addDays, format, startOfWeek } from "date-fns";
 import { DAY_END_HOUR, DAY_START_HOUR, MAX_BOOKING_MINUTES, SLOT_MINUTES } from "@/lib/config";
 import { requireUser } from "@/lib/auth/session";
 import { imageUrl } from "@/lib/data";
-import { getActiveRooms, getRepositoryForRequest, getRoomLayout } from "@/lib/data/queries";
+import { getActiveRooms, getInventoryItems, getRepositoryForRequest, getRoomLayout } from "@/lib/data/queries";
 import type { Room } from "@/lib/data/types";
 import { buildDaySlots, groupIntoSegments } from "@/lib/domain/availability";
 import { formatDateKey, formatTimeRange } from "@/lib/domain/time";
@@ -48,7 +48,7 @@ const googleNotices: Record<string, { tone: "success" | "error" | "warning"; tex
 export default async function RoomPage({ params, searchParams }: PageProps<"/rooms/[slug]">) {
   const user = await requireUser();
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const [room, rooms] = await Promise.all([loadRoom(slug), getActiveRooms()]);
+  const [room, rooms, inventoryItems] = await Promise.all([loadRoom(slug), getActiveRooms(), getInventoryItems()]);
   const layout = await getRoomLayout(room.id);
 
   const { first, last } = bookableDateRange(new Date());
@@ -132,7 +132,7 @@ export default async function RoomPage({ params, searchParams }: PageProps<"/roo
           </Suspense>
           <div className="mt-10">
             <Suspense key={dateKey} fallback={<ScheduleSkeleton />}>
-              <RoomSchedule room={room} dateKey={dateKey} userId={user.id} returnTo={`/rooms/${room.slug}?date=${dateKey}`} />
+              <RoomSchedule room={room} dateKey={dateKey} userId={user.id} returnTo={`/rooms/${room.slug}?date=${dateKey}`} inventoryItems={inventoryItems} />
             </Suspense>
           </div>
         </div>
@@ -201,7 +201,7 @@ async function loadAvailability(room: Room, dateKey: string, userId: string) {
   }
 }
 
-async function RoomSchedule({ room, dateKey, userId, returnTo }: { room: Room; dateKey: string; userId: string; returnTo: string }) {
+async function RoomSchedule({ room, dateKey, userId, returnTo, inventoryItems }: { room: Room; dateKey: string; userId: string; returnTo: string; inventoryItems: import("@/lib/data/types").InventoryItem[] }) {
   const availability = await loadAvailability(room, dateKey, userId);
   return (
     <BookingPanel
@@ -217,6 +217,7 @@ async function RoomSchedule({ room, dateKey, userId, returnTo }: { room: Room; d
       googleRequired={availability.googleRequired}
       googleConnected={availability.googleConnected}
       returnTo={returnTo}
+      inventoryItems={inventoryItems}
     />
   );
 }

@@ -337,6 +337,33 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
+export type ItemRequestStatus = "submitted" | "approved" | "fulfilled" | "rejected";
+export interface ItemRequest {
+  id: string;
+  bookingId: string;
+  itemId: string | null;
+  itemName: string;
+  itemUnit: InventoryUnit;
+  quantity: number;
+  notes: string | null;
+  status: ItemRequestStatus;
+  reviewedBy: string | null;
+  reviewerName?: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ItemRequestHistory {
+  id: string;
+  itemRequestId: string;
+  fromStatus: ItemRequestStatus | null;
+  toStatus: ItemRequestStatus;
+  changedBy: string | null;
+  changedByName?: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 export interface CreateInventoryItemInput {
   name: string;
   category: InventoryCategory;
@@ -589,6 +616,3 @@ export interface CreateAuditLogInput {
   details?: Record<string, unknown> | null;
   ipAddress?: string | null;
 }
-
-
-

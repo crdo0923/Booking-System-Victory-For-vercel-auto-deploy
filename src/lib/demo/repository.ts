@@ -786,6 +786,46 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       item.updatedAt = new Date().toISOString();
       return true;
     },
+    async createItemRequests(bookingId, requests) {
+      state.itemRequests ??= [];
+      state.itemRequestHistory ??= [];
+      const itemRequests = state.itemRequests;
+      const itemRequestHistory = state.itemRequestHistory;
+      return requests.map((input) => {
+        const item = input.itemId ? state.inventoryItems?.find((i) => i.id === input.itemId) : null;
+        if (input.itemId && !item) throw new RepositoryError("not_found", "Inventory item not found.");
+        const now = new Date().toISOString();
+        const request = { id: randomUUID(), bookingId, itemId: item?.id ?? null, itemName: item?.name ?? input.notes ?? "Other", itemUnit: item?.unit ?? "pieces" as const, quantity: input.quantity, notes: input.notes ?? null, status: "submitted" as const, reviewedBy: null, reviewerName: null, reviewedAt: null, createdAt: now, updatedAt: now };
+        itemRequests.push(request);
+        itemRequestHistory.push({ id: randomUUID(), itemRequestId: request.id, fromStatus: null, toStatus: "submitted" as const, changedBy: actorId, changedByName: state.users.find((u) => u.id === actorId)?.fullName ?? null, note: null, createdAt: now });
+        return copy(request);
+      });
+    },
+    async listItemRequestsForBooking(bookingId) { return copy((state.itemRequests ?? []).filter((r) => r.bookingId === bookingId)); },
+    async listItemRequestsForUser(userId) {
+      const bookingIds = state.bookings.filter((b) => b.userId === userId).map((b) => b.id);
+      return copy((state.itemRequests ?? []).filter((r) => bookingIds.includes(r.bookingId)));
+    },
+    async listItemRequests(status) { return copy((state.itemRequests ?? []).filter((r) => !status || r.status === status)); },
+    async listItemRequestHistory(requestId) { return copy((state.itemRequestHistory ?? []).filter((h) => h.itemRequestId === requestId).reverse()); },
+    async updateItemRequestStatus(id, status, note) {
+      if (!actorIsActiveAdmin()) throw new RepositoryError("forbidden", "Only administrators can update item requests.");
+      const request = (state.itemRequests ?? []).find((r) => r.id === id);
+      if (!request) return null;
+      if (["fulfilled", "rejected"].includes(request.status)) throw new RepositoryError("invalid", "This request is already closed.");
+      const fromStatus = request.status;
+      if (!((fromStatus === "submitted" && (status === "approved" || status === "rejected")) || (fromStatus === "approved" && status === "fulfilled"))) {
+        throw new RepositoryError("invalid", "That item request status transition is not allowed.");
+      }
+      request.status = status;
+      request.reviewedBy = actorId;
+      request.reviewerName = state.users.find((u) => u.id === actorId)?.fullName ?? null;
+      request.reviewedAt = new Date().toISOString();
+      request.updatedAt = request.reviewedAt;
+      state.itemRequestHistory ??= [];
+      state.itemRequestHistory.push({ id: randomUUID(), itemRequestId: id, fromStatus, toStatus: status, changedBy: actorId, changedByName: request.reviewerName, note: note ?? null, createdAt: request.reviewedAt });
+      return copy(request);
+    },
     async createShuttleRequest(input) {
       state.shuttles ??= [];
       const request = { ...input, id: randomUUID(), status: "pending" as const, denialReason: null, finalGas: null, finalToll: null, finalOther: null, driverId: null, reviewedBy: null, reviewedAt: null, createdAt: new Date().toISOString() };

@@ -33,6 +33,7 @@ export const bookingRequestSchema = z.object({
     .trim()
     .min(3, { error: "Briefly describe the purpose of the booking." })
     .max(1000, { error: "Keep the purpose under 1000 characters." }),
+  itemRequests: z.string().optional().default(""),
 });
 
 export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;

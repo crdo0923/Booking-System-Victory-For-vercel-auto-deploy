@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { TimeRange } from "@/lib/domain/availability";
-import type { AccessChange, AccessStatus, Announcement, AssetMovement, AuditLogEntry, Booking, InventoryItem, InventoryTransaction, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomAsset, RoomLayout, ShuttleRequest, SystemRole } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, AssetMovement, AuditLogEntry, Booking, InventoryItem, InventoryTransaction, ItemRequest, ItemRequestHistory, KioskDisplay, LayoutPreset, RescheduleRequest, Role, RoleChange, Room, RoomAsset, RoomLayout, ShuttleRequest, SystemRole } from "@/lib/data/types";
 import { isProduction } from "@/lib/env";
 import { createDemoSeed } from "@/lib/demo/seed";
 
@@ -47,6 +47,8 @@ export interface DemoState {
   kioskDisplays: KioskDisplay[];
   inventoryItems: InventoryItem[];
   inventoryTransactions: InventoryTransaction[];
+  itemRequests?: ItemRequest[];
+  itemRequestHistory?: ItemRequestHistory[];
   roomAssets: RoomAsset[];
   assetMovements: AssetMovement[];
   auditLogs: AuditLogEntry[];

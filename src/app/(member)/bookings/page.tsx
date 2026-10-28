@@ -62,7 +62,8 @@ export default async function MyBookingsPage({ searchParams }: PageProps<"/booki
 
   const now = new Date();
   const repo = await getRepositoryForRequest();
-  const [all, requests] = await Promise.all([repo.listBookingsForUser(user.id), repo.listRescheduleRequestsForUser(user.id)]);
+  const [all, requests, itemRequests] = await Promise.all([repo.listBookingsForUser(user.id), repo.listRescheduleRequestsForUser(user.id), repo.listItemRequestsForUser(user.id)]);
+  const itemRequestHistory = Object.fromEntries(await Promise.all(itemRequests.map(async (request) => [request.id, await repo.listItemRequestHistory(request.id)] as const)));
   const requestsByBooking = new Map<string, RescheduleRequest[]>();
   for (const request of requests) requestsByBooking.set(request.bookingId, [...(requestsByBooking.get(request.bookingId) ?? []), request]);
   const counts = Object.fromEntries(views.map((v) => [v, filterBookings(all, v, now).length])) as Record<View, number>;
@@ -98,6 +99,31 @@ export default async function MyBookingsPage({ searchParams }: PageProps<"/booki
         label="Filter bookings"
         tabs={views.map((v) => ({ href: v === "upcoming" ? "/bookings" : `/bookings?view=${v}`, label: labels[v], count: counts[v], active: v === view }))}
       />
+
+      {itemRequests.length > 0 && (
+        <section className="mt-10 border-y border-line py-5" aria-labelledby="item-request-history">
+          <h2 id="item-request-history" className="text-lg font-extrabold">Room setup requests</h2>
+          <p className="mt-1 text-sm text-muted">Track chairs, equipment, and supplies requested with your bookings.</p>
+          <ul className="mt-4 divide-y divide-line">
+            {itemRequests.map((request) => (
+              <li key={request.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                <span className="font-semibold">{request.quantity} × {request.itemName}</span>
+                <span className="eyebrow text-muted">{request.status[0].toUpperCase() + request.status.slice(1)}</span>
+                {(itemRequestHistory[request.id] ?? []).length > 0 && (
+                  <details className="w-full text-xs text-muted">
+                    <summary className="cursor-pointer font-semibold">Status history</summary>
+                    <ul className="mt-2 space-y-1">
+                      {itemRequestHistory[request.id].map((event) => (
+                        <li key={event.id}>{event.fromStatus ?? "New"} → {event.toStatus}{event.note ? ` · ${event.note}` : ""}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {list.length > 0 ? (
         <div className="mt-2">
