@@ -9,7 +9,9 @@ test.describe("Admin Rooms Management", () => {
     await page.goto("/admin/rooms");
     await expect(page.getByRole("heading", { name: "Rooms & Facilities", level: 1 })).toBeVisible();
 
-    // 2. Fill the Create Room form
+    // 2. Open Add Room dialog and fill the Create Room form
+    await page.getByRole("button", { name: "Add Room" }).click();
+
     const roomName = `Alpha Hall ${Date.now()}`;
     await page.getByLabel("Room name").fill(roomName);
     await page.getByLabel("Building").fill("East Tower");

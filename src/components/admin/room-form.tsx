@@ -65,6 +65,7 @@ function RoomFormFields({ initial, onDone, onCreated }: RoomFormProps & { onCrea
         } else {
           setPreview(null);
           onCreated();
+          onDone?.();
         }
       } else if (result && !result.ok) {
         toast.error(result.error);

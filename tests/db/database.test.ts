@@ -60,6 +60,12 @@ async function errorMessage(sql: string): Promise<string | null> {
 
 beforeAll(async () => {
   db = new PGlite({ extensions: { btree_gist } });
+  await db.exec(`
+    create schema if not exists auth;
+    create or replace function auth.uid() returns uuid language sql stable as $$
+      select nullif(current_setting('app.user_id', true), '')::uuid;
+    $$;
+  `);
   for (const file of readdirSync(MIGRATIONS).sort()) {
     await db.exec(readFileSync(join(MIGRATIONS, file), "utf8"));
   }

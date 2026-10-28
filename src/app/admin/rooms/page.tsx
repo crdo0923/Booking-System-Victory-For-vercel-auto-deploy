@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { imageUrl } from "@/lib/data";
 import { getAllRooms } from "@/lib/data/queries";
 import { firstParam } from "@/lib/validation/params";
-import { RoomForm } from "@/components/admin/room-form";
+import { AddRoomDialog } from "@/components/admin/add-room-dialog";
 import { RoomRowActions } from "@/components/admin/room-row-actions";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkTabs } from "@/components/ui/link-tabs";
@@ -54,30 +54,34 @@ export default async function AdminRoomsPage({ searchParams }: PageProps) {
         variant="operational"
         title="Rooms & Facilities"
         description="Configure church sanctuaries, ministry halls, and meeting rooms. Set dimensions for the seating layout editor, capacity, and air conditioning specs."
+        actions={<AddRoomDialog />}
       />
 
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        {/* Left Column: Room List */}
+      <div className="space-y-6">
+        {/* Room List */}
         <section aria-labelledby="rooms-list-heading" className="min-w-0">
           <h2 id="rooms-list-heading" className="sr-only">
             All rooms
           </h2>
 
-          <LinkTabs
-            label="Filter rooms by status"
-            tabs={filters.map((f) => ({
-              href: f === "all" ? "/admin/rooms" : `/admin/rooms?status=${f}`,
-              label: filterLabels[f],
-              count: counts[f],
-              active: f === filter,
-            }))}
-          />
+          <div className="flex items-center justify-between border-b border-line pb-4">
+            <LinkTabs
+              label="Filter rooms by status"
+              tabs={filters.map((f) => ({
+                href: f === "all" ? "/admin/rooms" : `/admin/rooms?status=${f}`,
+                label: filterLabels[f],
+                count: counts[f],
+                active: f === filter,
+              }))}
+            />
+          </div>
 
           {list.length === 0 ? (
             <EmptyState
               className="mt-10"
               title="No rooms match this filter"
-              description="Create a room using the form to make it bookable for ministries."
+              description="Create a room to make it bookable for ministries."
+              action={<AddRoomDialog />}
             />
           ) : (
             <ol className="divide-y divide-line border-b border-line">
@@ -144,21 +148,6 @@ export default async function AdminRoomsPage({ searchParams }: PageProps) {
             </ol>
           )}
         </section>
-
-        {/* Right Column: Add Room Form */}
-        <aside aria-labelledby="create-room-heading" className="space-y-4">
-          <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
-            <h2 id="create-room-heading" className="font-serif text-xl font-bold text-ink">
-              Add new room
-            </h2>
-            <p className="mt-1 text-xs text-muted">
-              Add a space to make it bookable for services, life groups, or ministry meetings.
-            </p>
-            <div className="mt-6">
-              <RoomForm />
-            </div>
-          </div>
-        </aside>
       </div>
     </div>
   );
