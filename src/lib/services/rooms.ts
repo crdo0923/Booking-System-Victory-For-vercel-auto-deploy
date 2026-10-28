@@ -1,6 +1,5 @@
 import type { SessionUser } from "@/lib/auth/provider";
 import { RepositoryError, type ImageStorage, type Repository } from "@/lib/data/repository";
-import type { Room } from "@/lib/data/types";
 import { failure, fieldErrorsFrom, success, type ServiceResult } from "@/lib/services/result";
 import { safeImagePath, validateImageUpload } from "@/lib/storage/images";
 import { roomIdSchema, roomFieldsSchema } from "@/lib/validation/rooms";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Printer, Download, X } from "lucide-react";
+import { Printer } from "lucide-react";
 import type { LayoutElement, Room } from "@/lib/data/types";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ export function UsherPrintModal({
         {/* Print preview controls */}
         <div className="flex items-center justify-between border-b border-line pb-3">
           <div className="text-xs text-muted">
-            Format: High-contrast monochrome vector. Suitable for standard 8.5"×11" / A4 paper.
+            Format: High-contrast monochrome vector. Suitable for standard 8.5&quot;×11&quot; / A4 paper.
           </div>
           <Button variant="primary" size="sm" onClick={handlePrint} className="flex items-center gap-1.5">
             <Printer className="size-4" />
@@ -102,7 +102,7 @@ export function UsherPrintModal({
 
                 return (
                   <g key={el.id} transform={`rotate(${el.rotation}, ${cx}, ${cy})`}>
-                    {renderUsherShape(el, x, y, w, h, scale)}
+                    {renderUsherShape(el, x, y, w, h)}
                   </g>
                 );
               })}
@@ -136,7 +136,7 @@ export function UsherPrintModal({
   );
 }
 
-function renderUsherShape(el: LayoutElement, x: number, y: number, w: number, h: number, scale: number) {
+function renderUsherShape(el: LayoutElement, x: number, y: number, w: number, h: number) {
   const seats = calculateSeats(el);
 
   if (el.type === "stage") {

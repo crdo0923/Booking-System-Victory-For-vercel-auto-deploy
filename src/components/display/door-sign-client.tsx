@@ -74,7 +74,8 @@ export function DoorSignClient({
   useEffect(() => {
     if (!autoRotate) return;
     // 6 seconds for Fullscreen blueprint, 10 seconds for standard schedule view
-    setCycleCountdown(isExpanded ? 6 : 10);
+    const timer = window.setTimeout(() => setCycleCountdown(isExpanded ? 6 : 10), 0);
+    return () => window.clearTimeout(timer);
   }, [isExpanded, autoRotate]);
 
   // Poll room data every 3s with real-time focus & visibility sync
@@ -194,7 +195,6 @@ export function DoorSignClient({
   const isOccupied = customStatus === "auto" ? Boolean(currentBooking) : customStatus === "in_use";
   const isMaintenance = customStatus === "maintenance";
   const isCleaning = customStatus === "cleaning";
-  const isAvailable = customStatus === "available" || (customStatus === "auto" && !currentBooking);
 
   // Status visual attributes
   const statusHeadline = useMemo(() => {
@@ -970,7 +970,7 @@ export function DoorSignClient({
           <div className="border border-line bg-surface p-5 rounded-sm flex-1 flex flex-col min-h-0">
             <div className="flex items-baseline justify-between pb-3 border-b border-line shrink-0">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted">
-                Today's Schedule
+                Today&apos;s Schedule
               </h3>
               <span className="text-xs font-bold text-muted tabular-nums">
                 {bookings.length} reservations

@@ -1,14 +1,11 @@
 import type { SessionUser } from "@/lib/auth/provider";
 import { RepositoryError, type Repository } from "@/lib/data/repository";
-import type { InventoryItem } from "@/lib/data/types";
 import { failure, fieldErrorsFrom, success, type ServiceResult } from "@/lib/services/result";
 import { logAuditEvent } from "@/lib/services/audit";
 import {
   inventoryItemFieldsSchema,
   inventoryItemIdSchema,
   inventoryTransactionSchema,
-  type InventoryItemFields,
-  type InventoryTransactionFields,
 } from "@/lib/validation/inventory";
 
 export interface InventoryDeps {

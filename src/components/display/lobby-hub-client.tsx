@@ -29,7 +29,7 @@ export function LobbyHubClient({
   const [rooms, setRooms] = useState<Room[]>(initialRooms);
   const [bookings, setBookings] = useState<BookingDetails[]>(initialBookings);
   const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
-  const [isOnline, setIsOnline] = useState(true);
+  const [, setIsOnline] = useState(true);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
 
@@ -206,7 +206,7 @@ export function LobbyHubClient({
               Victory Church Facility Hub · {displayLabel}
             </p>
             <h1 className="headline text-2xl lg:text-3xl text-ink leading-none mt-1">
-              Room Directory & Today's Schedule
+              Room Directory &               Today&apos;s Schedule
             </h1>
           </div>
         </div>

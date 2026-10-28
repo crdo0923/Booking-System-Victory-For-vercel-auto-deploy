@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Check, Copy, ExternalLink, Monitor, Plus, PowerOff, Tablet } from "lucide-react";
 import type { KioskDisplay, KioskDisplayType, Room } from "@/lib/data/types";
 import { createDisplayAction, revokeDisplayAction } from "@/app/actions/displays";
@@ -17,7 +17,6 @@ export function DisplaysManager({ initialDisplays, rooms }: DisplaysManagerProps
   const [displays, setDisplays] = useState<KioskDisplay[]>(initialDisplays);
   const [isPending, startTransition] = useTransition();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
 
   // Form state for creating new pairing
   const [label, setLabel] = useState("");
@@ -25,12 +24,8 @@ export function DisplaysManager({ initialDisplays, rooms }: DisplaysManagerProps
   const [roomId, setRoomId] = useState<string>(rooms[0]?.id || "");
   const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   function getDisplayUrl(display: KioskDisplay) {
-    if (!mounted || typeof window === "undefined") return "";
+    if (typeof window === "undefined") return "";
     const origin = window.location.origin;
     if (display.displayType === "door_sign") {
       const room = rooms.find((r) => r.id === display.roomId);
@@ -259,7 +254,7 @@ export function DisplaysManager({ initialDisplays, rooms }: DisplaysManagerProps
                   <Tablet className="size-4 text-brand" />
                   <span className="text-xs font-bold text-ink">Door Sign</span>
                 </div>
-                <span className="text-[11px] text-muted">10" Wall tablet</span>
+                <span className="text-[11px] text-muted">10&quot; Wall tablet</span>
               </button>
 
               <button
@@ -275,7 +270,7 @@ export function DisplaysManager({ initialDisplays, rooms }: DisplaysManagerProps
                   <Monitor className="size-4 text-brand" />
                   <span className="text-xs font-bold text-ink">Lobby Hub</span>
                 </div>
-                <span className="text-[11px] text-muted">50"+ TV Display</span>
+                <span className="text-[11px] text-muted">50&quot;+ TV Display</span>
               </button>
             </div>
           </div>

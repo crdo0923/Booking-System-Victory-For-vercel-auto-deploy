@@ -11,7 +11,7 @@ interface SignOutButtonProps {
   variant?: "icon" | "nav" | "compact";
 }
 
-export function SignOutButton({ className, variant = "icon" }: SignOutButtonProps) {
+export function SignOutButton({ variant = "icon" }: SignOutButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 

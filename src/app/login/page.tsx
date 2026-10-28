@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getDataMode } from "@/lib/env";
 import { safeRedirectPath } from "@/lib/utils";
 import { firstParam } from "@/lib/validation/params";
 import { AuthForm } from "@/components/auth/auth-form";
@@ -19,7 +18,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const next = requested === "/" ? "/portal" : requested;
   if (await getCurrentUser()) redirect(next);
 
-  const isDemo = getDataMode() === "demo";
   const passwordReset = firstParam(params.reset) === "1";
 
   const quickAccounts: DemoQuickAccount[] = [

@@ -57,7 +57,7 @@ export function InventoryManager({
 }: InventoryManagerProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("catalog");
   const [items, setItems] = useState<InventoryItem[]>(initialItems);
-  const [transactions, setTransactions] = useState<InventoryTransaction[]>(initialTransactions);
+  const [transactions] = useState<InventoryTransaction[]>(initialTransactions);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<InventoryCategory | "all">("all");
 

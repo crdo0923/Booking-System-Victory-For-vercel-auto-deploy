@@ -208,13 +208,14 @@ export async function createBookingRequest(
         const clean = requests.map((request) => {
           if (!request || typeof request !== "object") throw new Error("invalid item");
           const item = request as { itemId?: unknown; quantity?: unknown; notes?: unknown };
-          if (typeof item.itemId !== "string" || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) throw new Error("invalid item");
+          const quantity = item.quantity;
+          if (typeof item.itemId !== "string" || typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new Error("invalid item");
           if (item.itemId === "other") {
             if (typeof item.notes !== "string" || item.notes.trim().length < 2 || item.notes.trim().length > 200) throw new Error("custom description");
-            return { itemId: null, quantity: item.quantity, notes: item.notes.trim() };
+            return { itemId: null, quantity, notes: item.notes.trim() };
           }
           if (item.notes !== undefined && item.notes !== null) throw new Error("invalid item");
-          return { itemId: item.itemId, quantity: item.quantity, notes: null };
+          return { itemId: item.itemId, quantity, notes: null };
         });
         if (clean.length) await deps.repo.createItemRequests(booking.id, clean);
       } catch (error) {

@@ -5,9 +5,7 @@ import {
   Archive,
   ArrowRightLeft,
   CheckCircle2,
-  Clock,
   Edit2,
-  Filter,
   Layers,
   Lock,
   Plus,
@@ -43,7 +41,7 @@ const CATEGORY_LABELS: Record<AssetCategory, string> = {
 export function AssetManager({ initialAssets, initialMovements, rooms }: AssetManagerProps) {
   const [activeTab, setActiveTab] = useState<"assets" | "movements">("assets");
   const [assets, setAssets] = useState<RoomAsset[]>(initialAssets);
-  const [movements, setMovements] = useState<AssetMovement[]>(initialMovements);
+  const [movements] = useState<AssetMovement[]>(initialMovements);
 
   // Filters
   const [search, setSearch] = useState("");

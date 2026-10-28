@@ -3,14 +3,10 @@
 import { useState } from "react";
 import {
   Church,
-  Grid,
-  Maximize2,
-  Minimize2,
   Plus,
   Users,
   Table as TableIcon,
   Columns,
-  DoorOpen,
   HelpCircle,
 } from "lucide-react";
 import { PALETTE_ITEMS, type PaletteItem } from "./elements-meta";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FolderDown, BookmarkPlus, Sparkles, Check } from "lucide-react";
+import { FolderDown, BookmarkPlus } from "lucide-react";
 import type { LayoutPreset, RoomLayout } from "@/lib/data/types";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -158,7 +158,7 @@ export function TemplateSelector({
             <label className="block text-xs font-bold text-ink">Category</label>
             <Select
               value={presetCat}
-              onChange={(e) => setPresetCat(e.target.value as any)}
+              onChange={(e) => setPresetCat(e.target.value as typeof presetCat)}
               className="mt-1 text-sm"
             >
               <option value="worship">Sunday Worship & Praise</option>

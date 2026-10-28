@@ -11,6 +11,7 @@ test("member requests a room, admin approves, it syncs to Google, member cancels
   await expect(row.getByText("Pending review")).toBeVisible();
 
   const admin = await newSession(browser, "admin");
+  await admin.goto("/admin/bookings");
   await expect(admin.getByRole("heading", { name: /^Booking requests/ })).toBeVisible();
   await expect(admin.getByRole("link", { name: eventName })).toBeVisible();
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent, type MouseEvent } from "react";
-import { Copy, Trash2, RotateCw, Layers } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent, type MouseEvent } from "react";
+import { Copy, Trash2, RotateCw } from "lucide-react";
 import type { LayoutElement } from "@/lib/data/types";
 import { calculateSeats } from "./elements-meta";
 
@@ -60,6 +60,24 @@ export function Canvas({
   const [clipboard, setClipboard] = useState<LayoutElement | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
+  const duplicateSpecificElement = useCallback((source: LayoutElement) => {
+    if (onDuplicateElement) {
+      onDuplicateElement(source.id);
+      return;
+    }
+    const newX = Math.min(roomWidthMeters - source.width, source.x + 0.5);
+    const newY = Math.min(roomLengthMeters - source.length, source.y + 0.5);
+    const newEl: LayoutElement = {
+      ...source,
+      id: `elem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      x: Math.round(newX * 10) / 10,
+      y: Math.round(newY * 10) / 10,
+      label: source.label ? `${source.label} (Copy)` : undefined,
+    };
+    onUpdateElement(newEl);
+    onSelect(newEl.id);
+  }, [onDuplicateElement, onSelect, onUpdateElement, roomLengthMeters, roomWidthMeters]);
+
   // Close context menu on outside click or escape
   useEffect(() => {
     function handleClickOutside() {
@@ -113,26 +131,7 @@ export function Canvas({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, elements, clipboard, onDeleteElement]);
-
-  function duplicateSpecificElement(source: LayoutElement) {
-    if (onDuplicateElement) {
-      onDuplicateElement(source.id);
-      return;
-    }
-    // Fallback direct duplicate
-    const newX = Math.min(roomWidthMeters - source.width, source.x + 0.5);
-    const newY = Math.min(roomLengthMeters - source.length, source.y + 0.5);
-    const newEl: LayoutElement = {
-      ...source,
-      id: `elem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      x: Math.round(newX * 10) / 10,
-      y: Math.round(newY * 10) / 10,
-      label: source.label ? `${source.label} (Copy)` : undefined,
-    };
-    onUpdateElement(newEl);
-    onSelect(newEl.id);
-  }
+  }, [selectedId, elements, clipboard, onDeleteElement, duplicateSpecificElement]);
 
   function handleRotate(id: string) {
     const el = elements.find((item) => item.id === id);

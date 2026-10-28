@@ -61,15 +61,15 @@ export function StockTransactionDialog({
 
   useEffect(() => {
     if (initialItemId) {
-      setSelectedItemId(initialItemId);
+      setTimeout(() => setSelectedItemId(initialItemId), 0);
     } else if (!selectedItemId && items.length > 0) {
-      setSelectedItemId(items[0].id);
+      setTimeout(() => setSelectedItemId(items[0].id), 0);
     }
   }, [initialItemId, items, selectedItemId]);
 
   useEffect(() => {
     if (initialType) {
-      setTxType(initialType);
+      setTimeout(() => setTxType(initialType), 0);
     }
   }, [initialType]);
 
@@ -77,7 +77,7 @@ export function StockTransactionDialog({
     if (state?.ok) {
       onOpenChange(false);
       onSuccess?.();
-      setQuantity(1);
+      setTimeout(() => setQuantity(1), 0);
     }
   }, [state, onOpenChange, onSuccess]);
 

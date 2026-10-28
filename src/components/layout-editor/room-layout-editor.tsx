@@ -2,18 +2,15 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
   Save,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
   Printer,
-  Maximize2,
-  Minimize2,
   Grid,
-  Check,
 } from "lucide-react";
 import type { LayoutElement, LayoutPreset, Room, RoomLayout } from "@/lib/data/types";
 import { Toolbar } from "./toolbar";
@@ -33,6 +30,7 @@ interface RoomLayoutEditorProps {
 }
 
 export function RoomLayoutEditor({ room, allRooms, initialLayout, presets: initialPresets }: RoomLayoutEditorProps) {
+  const router = useRouter();
   // Room dimensions
   const roomWidthM = room.dimensionsWM ?? 8;
   const roomLengthM = room.dimensionsLM ?? 10;
@@ -156,7 +154,7 @@ export function RoomLayoutEditor({ room, allRooms, initialLayout, presets: initi
               <select
                 value={room.id}
                 onChange={(e) => {
-                  window.location.href = `/admin/rooms/${e.target.value}/layout`;
+                  router.push(`/admin/rooms/${e.target.value}/layout`);
                 }}
                 className="max-w-[180px] sm:max-w-[220px] truncate rounded-md border border-line bg-surface py-1 pl-2.5 pr-7 text-xs font-bold text-ink hover:border-ink/30 focus:border-brand focus:outline-none"
               >

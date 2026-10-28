@@ -58,7 +58,7 @@ export interface Room {
   customStatus?: "auto" | "available" | "in_use" | "maintenance" | "cleaning";
   customStatusMessage?: string | null;
   customStatusSubtitle?: string | null;
-  roomAttributes?: Record<string, any>;
+  roomAttributes?: Record<string, unknown>;
   isArchived?: boolean;
   imagePath: string | null;
   mapImagePath: string | null;
@@ -84,7 +84,7 @@ export interface CreateRoomInput {
   customStatus?: "auto" | "available" | "in_use" | "maintenance" | "cleaning";
   customStatusMessage?: string | null;
   customStatusSubtitle?: string | null;
-  roomAttributes?: Record<string, any>;
+  roomAttributes?: Record<string, unknown>;
   imagePath?: string | null;
   ghlCalendarId?: string | null;
 }
@@ -106,7 +106,7 @@ export interface UpdateRoomInput {
   customStatus?: "auto" | "available" | "in_use" | "maintenance" | "cleaning";
   customStatusMessage?: string | null;
   customStatusSubtitle?: string | null;
-  roomAttributes?: Record<string, any>;
+  roomAttributes?: Record<string, unknown>;
   imagePath?: string | null;
   ghlCalendarId?: string | null;
   isActive?: boolean;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Filter, Search } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Search } from "lucide-react";
 import type { InventoryTransaction, InventoryTransactionType, Room } from "@/lib/data/types";
 import { Input, Select } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -26,7 +26,6 @@ const TYPE_CONFIG: Record<
 export function StockMovementLedger({
   transactions,
   rooms,
-  onOpenStockAction,
 }: StockMovementLedgerProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");

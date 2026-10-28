@@ -14,7 +14,7 @@ export function StatusScreen({ eyebrow, title, description, footnote, children }
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-20">
       <div className="max-w-lg text-center">
-        <Image src="/brand/victory-mark.png" alt="Victory" width={44} height={44} className="mx-auto size-11" />
+        <Image src="/brand/victory-mark.png" alt="Victory" width={44} height={44} priority className="mx-auto size-11" />
         <p className="eyebrow mt-8 text-muted">{eyebrow}</p>
         <h1 className="headline mt-3 text-4xl">{title}</h1>
         <div className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-muted">{description}</div>

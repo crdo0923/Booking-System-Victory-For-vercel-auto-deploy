@@ -32,7 +32,7 @@ test.describe("Admin Interactive Spandi Layout Editor", () => {
 
     // 7. Test Presets modal
     await page.getByRole("button", { name: "Presets & Templates" }).click();
-    await expect(page.getByRole("heading", { name: "Load Seating Preset" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Seating Presets & Templates" })).toBeVisible();
     await expect(page.getByText("Sunday Worship (Theater Rows)")).toBeVisible();
     await expect(page.getByText("Leadership Workshop (Classroom)")).toBeVisible();
 

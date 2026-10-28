@@ -1,29 +1,21 @@
 "use client";
 
-import { Fragment, useId, useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import {
   Check,
-  ChevronDown,
-  ChevronRight,
   Clock,
   Download,
-  Filter,
   Minus,
   Printer,
   RefreshCw,
   Search,
   Shield,
-  ShieldAlert,
-  ShieldCheck,
-  User,
   X,
 } from "lucide-react";
 import type {
   AuditLogEntry,
-  AuditLogFilter,
   PermissionDefinition,
   RolePermissionRow,
-  SecurityCapability,
   SecurityModule,
 } from "@/lib/data/types";
 import { listAuditLogsAction } from "@/app/actions/audit";

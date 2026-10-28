@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Armchair, Layers, Maximize2, Minimize2, X, Download, Printer } from "lucide-react";
+import { MapPin, Armchair, Layers, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RoomImage } from "@/components/rooms/room-image";
 import { RoomMap, type MapRoom } from "@/components/rooms/room-map";
@@ -351,9 +351,9 @@ function renderViewerShape(
     case "stage": {
       const defaultCx = x + w / 2;
       const defaultCy = y + h / 2 + 4;
-      let labelX = defaultCx;
+      const labelX = defaultCx;
       let labelY = defaultCy;
-      let textAnchor: "middle" | "start" | "end" = "middle";
+      const textAnchor: "middle" | "start" | "end" = "middle";
 
       const labelBox = {
         x1: defaultCx - 40,

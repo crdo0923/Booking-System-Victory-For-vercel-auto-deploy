@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCw, Trash2, Sliders, Hash, Move } from "lucide-react";
+import { Trash2, Sliders, Move } from "lucide-react";
 import type { LayoutElement } from "@/lib/data/types";
 import { calculateSeats } from "./elements-meta";
 import { Input, Select } from "@/components/ui/field";
@@ -259,10 +259,10 @@ export function PropertiesPanel({
                   }}
                   className="h-8 text-xs"
                 >
-                  <option value="36">36" Round (4 seats)</option>
-                  <option value="48">48" Round (6 seats)</option>
-                  <option value="60">60" Round (8 seats)</option>
-                  <option value="72">72" Round (10 seats)</option>
+                  <option value="36">36&quot; Round (4 seats)</option>
+                  <option value="48">48&quot; Round (6 seats)</option>
+                  <option value="60">60&quot; Round (8 seats)</option>
+                  <option value="72">72&quot; Round (10 seats)</option>
                 </Select>
               </div>
             )}
@@ -285,8 +285,8 @@ export function PropertiesPanel({
                   }}
                   className="h-8 text-xs"
                 >
-                  <option value="30x72">30"×72" Seminar (2 seats)</option>
-                  <option value="30x96">30"×96" Seminar (3 seats)</option>
+                  <option value="30x72">30&quot;×72&quot; Seminar (2 seats)</option>
+                  <option value="30x96">30&quot;×96&quot; Seminar (3 seats)</option>
                 </Select>
               </div>
             )}

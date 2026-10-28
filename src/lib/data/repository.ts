@@ -24,7 +24,6 @@ import type {
   UserSummary,
   ShuttleRequest,
   ShuttleRequestDetails,
-  InventoryCategory,
   InventoryItem,
   ItemRequest,
   ItemRequestHistory,

@@ -1,7 +1,7 @@
 import "server-only";
 import { asMember } from "@/lib/db/client";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type Repository } from "@/lib/data/repository";
-import type { AccessStatus, AnnouncementInput, InventoryItem, ItemRequestStatus, LayoutPreset, RescheduleRequestDetails, RescheduleStatus, RoomAsset, RoomLayout } from "@/lib/data/types";
+import type { AccessStatus, AnnouncementInput, InventoryItem, ItemRequestStatus, KioskDisplay, RescheduleRequestDetails, RescheduleStatus, RoomLayout, ShuttleRequest, ShuttleRequestDetails } from "@/lib/data/types";
 import { PAST_DUE_MESSAGE, type BookingStatus } from "@/lib/domain/booking-rules";
 import { INACTIVE_PROMOTION_MESSAGE, LAST_ADMIN_MESSAGE, OWN_ROLE_MESSAGE, SAME_ROLE_MESSAGE } from "@/lib/domain/roles";
 import {
@@ -91,18 +91,32 @@ const ANNOUNCEMENT_COLUMNS: Record<keyof AnnouncementInput, string> = {
 const ACCESS_STATUSES: AccessStatus[] = ["pending", "active", "denied", "revoked"];
 const BOOKING_STATUSES: BookingStatus[] = ["pending", "approved", "denied", "cancelled"];
 const RESCHEDULE_STATUSES: RescheduleStatus[] = ["pending", "approved", "denied", "cancelled"];
-function mapShuttle(r: any) {
-  return { id:r.id, userId:r.user_id, dates:(r.dates ?? []).map((d:string|Date)=>String(d).slice(0,10)), origin:r.origin, destination:r.destination,
+type DbRow = Record<string, unknown>;
+
+function mapShuttle(r: DbRow) {
+  return { id:String(r.id), userId:String(r.user_id), dates:(Array.isArray(r.dates) ? r.dates : []).map((d)=>String(d).slice(0,10)), origin:String(r.origin), destination:String(r.destination),
     departureTime:String(r.departure_time).slice(0,5), arrivalTime:r.arrival_time ? String(r.arrival_time).slice(0,5) : null,
-    passengerCount:Number(r.passenger_count), purpose:r.purpose, estimatedGas:Number(r.estimated_gas), estimatedToll:Number(r.estimated_toll),
+    passengerCount:Number(r.passenger_count), purpose:String(r.purpose), estimatedGas:Number(r.estimated_gas), estimatedToll:Number(r.estimated_toll),
     estimatedOther:Number(r.estimated_other), finalGas:r.final_gas == null ? null : Number(r.final_gas), finalToll:r.final_toll == null ? null : Number(r.final_toll),
-    finalOther:r.final_other == null ? null : Number(r.final_other), status:r.status, denialReason:r.denial_reason, driverId:r.driver_id,
-    reviewedBy:r.reviewed_by, reviewedAt:r.reviewed_at ? new Date(r.reviewed_at).toISOString() : null, createdAt:new Date(r.created_at).toISOString() };
+    finalOther:r.final_other == null ? null : Number(r.final_other), status:String(r.status), denialReason:typeof r.denial_reason === "string" ? r.denial_reason : null, driverId:typeof r.driver_id === "string" ? r.driver_id : null,
+    reviewedBy:typeof r.reviewed_by === "string" ? r.reviewed_by : null, reviewedAt:r.reviewed_at ? new Date(String(r.reviewed_at)).toISOString() : null, createdAt:new Date(String(r.created_at)).toISOString() };
 }
-function mapShuttleDetails(r:any) {
+function mapShuttleDetails(r: DbRow) {
   return { ...mapShuttle(r), requester:{ id:r.user_id, fullName:r.requester_name, email:r.requester_email, phone:r.requester_phone },
-    driver:r.driver_id ? { id:r.driver_id, fullName:r.driver_name } : null,
+    driver:r.driver_id ? { id: String(r.driver_id), fullName:String(r.driver_name) } : null,
     reviewer:r.reviewed_by ? { id:r.reviewed_by, fullName:r.reviewer_name } : null };
+}
+function mapKioskDisplay(r: DbRow): KioskDisplay {
+  return {
+    id: String(r.id),
+    token: String(r.token),
+    displayType: r.displayType as KioskDisplay["displayType"],
+    roomId: typeof r.roomId === "string" ? r.roomId : null,
+    label: String(r.label),
+    isActive: Boolean(r.isActive),
+    lastSeenAt: r.lastSeenAt ? new Date(String(r.lastSeenAt)).toISOString() : null,
+    createdAt: new Date(String(r.createdAt)).toISOString(),
+  };
 }
 
 /**
@@ -641,35 +655,35 @@ export function createPostgresRepository(actorId: string | null): Repository {
     },
 
     async createShuttleRequest(input) {
-      const row = await first<any>("createShuttleRequest", `insert into public.shuttle_requests
+      const row = await first<DbRow>("createShuttleRequest", `insert into public.shuttle_requests
         (user_id, dates, origin, destination, departure_time, arrival_time, passenger_count, purpose, estimated_gas, estimated_toll, estimated_other)
         values ($1,$2::date[],$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
         [input.userId, input.dates, input.origin, input.destination, input.departureTime, input.arrivalTime, input.passengerCount, input.purpose, input.estimatedGas, input.estimatedToll, input.estimatedOther]);
-      return mapShuttle(row!);
+      return mapShuttle(row!) as ShuttleRequest;
     },
     async listShuttleRequestsForUser(userId) {
-      return (await query<any>("listShuttleRequestsForUser", `select s.*, p.full_name requester_name, p.email requester_email, p.phone requester_phone,
+      return (await query<DbRow>("listShuttleRequestsForUser", `select s.*, p.full_name requester_name, p.email requester_email, p.phone requester_phone,
         d.full_name driver_name, r.full_name reviewer_name from public.shuttle_requests s join public.profiles p on p.id=s.user_id
-        left join public.profiles d on d.id=s.driver_id left join public.profiles r on r.id=s.reviewed_by where s.user_id=$1 order by s.created_at desc`, [userId])).map(mapShuttleDetails);
+        left join public.profiles d on d.id=s.driver_id left join public.profiles r on r.id=s.reviewed_by where s.user_id=$1 order by s.created_at desc`, [userId])).map((row) => mapShuttleDetails(row) as ShuttleRequestDetails);
     },
     async listShuttleRequests(status) {
-      return (await query<any>("listShuttleRequests", `select s.*, p.full_name requester_name, p.email requester_email, p.phone requester_phone,
+      return (await query<DbRow>("listShuttleRequests", `select s.*, p.full_name requester_name, p.email requester_email, p.phone requester_phone,
         d.full_name driver_name, r.full_name reviewer_name from public.shuttle_requests s join public.profiles p on p.id=s.user_id
         left join public.profiles d on d.id=s.driver_id left join public.profiles r on r.id=s.reviewed_by
-        where $1::text is null or s.status=$1 order by s.created_at desc`, [status ?? null])).map(mapShuttleDetails);
+        where $1::text is null or s.status=$1 order by s.created_at desc`, [status ?? null])).map((row) => mapShuttleDetails(row) as ShuttleRequestDetails);
     },
     async reviewShuttleRequest(input) {
-      const row = await first<any>("reviewShuttleRequest", `update public.shuttle_requests set status=$2,
+      const row = await first<DbRow>("reviewShuttleRequest", `update public.shuttle_requests set status=$2,
         denial_reason=$3, driver_id=$4, final_gas=$5, final_toll=$6, final_other=$7,
         reviewed_by=public.app_current_user_id(), reviewed_at=now() where id=$1 and status='pending' returning *`,
         [input.id, input.status, input.denialReason ?? null, input.driverId ?? null, input.finalGas ?? null, input.finalToll ?? null, input.finalOther ?? null]);
-      return row ? mapShuttle(row) : null;
+      return row ? mapShuttle(row) as ShuttleRequest : null;
     },
     async listShuttleDrivers() {
-      return query<any>("listShuttleDrivers", "select id, full_name from public.profiles where access_status='active' order by full_name").then(rows => rows.map(r => ({ id: r.id, fullName: r.full_name })));
+      return query<DbRow>("listShuttleDrivers", "select id, full_name from public.profiles where access_status='active' order by full_name").then(rows => rows.map(r => ({ id: String(r.id), fullName: String(r.full_name) })));
     },
     async getShuttleCostSummary() {
-      const row = await first<any>("getShuttleCostSummary", `select coalesce(sum(estimated_gas+estimated_toll+estimated_other),0) estimated,
+      const row = await first<DbRow>("getShuttleCostSummary", `select coalesce(sum(estimated_gas+estimated_toll+estimated_other),0) estimated,
         coalesce(sum(coalesce(final_gas,0)+coalesce(final_toll,0)+coalesce(final_other,0)),0) final,
         count(*) filter (where status='approved')::int approved_count from public.shuttle_requests`);
       return { estimated: Number(row?.estimated ?? 0), final: Number(row?.final ?? 0), approvedCount: Number(row?.approved_count ?? 0) };
@@ -784,22 +798,13 @@ export function createPostgresRepository(actorId: string | null): Repository {
 
     async listKioskDisplays() {
       try {
-        const rows = await query<any>(
+        const rows = await query<DbRow>(
           "listKioskDisplays",
           `select id, token, display_type as "displayType", room_id as "roomId", label, is_active as "isActive", last_seen_at as "lastSeenAt", created_at as "createdAt"
            from public.kiosk_displays
            order by created_at desc`,
         );
-        return rows.map((r) => ({
-          id: r.id,
-          token: r.token,
-          displayType: r.displayType,
-          roomId: r.roomId,
-          label: r.label,
-          isActive: Boolean(r.isActive),
-          lastSeenAt: r.lastSeenAt ? new Date(r.lastSeenAt).toISOString() : null,
-          createdAt: new Date(r.createdAt).toISOString(),
-        }));
+        return rows.map(mapKioskDisplay);
       } catch {
         return [];
       }
@@ -807,7 +812,7 @@ export function createPostgresRepository(actorId: string | null): Repository {
 
     async getKioskDisplayByToken(token) {
       try {
-        const r = await first<any>(
+        const r = await first<DbRow>(
           "getKioskDisplayByToken",
           `select id, token, display_type as "displayType", room_id as "roomId", label, is_active as "isActive", last_seen_at as "lastSeenAt", created_at as "createdAt"
            from public.kiosk_displays
@@ -816,16 +821,7 @@ export function createPostgresRepository(actorId: string | null): Repository {
           [token],
         );
         if (!r) return null;
-        return {
-          id: r.id,
-          token: r.token,
-          displayType: r.displayType,
-          roomId: r.roomId,
-          label: r.label,
-          isActive: Boolean(r.isActive),
-          lastSeenAt: r.lastSeenAt ? new Date(r.lastSeenAt).toISOString() : null,
-          createdAt: new Date(r.createdAt).toISOString(),
-        };
+        return mapKioskDisplay(r);
       } catch {
         return null;
       }
@@ -833,7 +829,7 @@ export function createPostgresRepository(actorId: string | null): Repository {
 
     async createKioskDisplay(input) {
       const token = `kiosk_${crypto.randomUUID().replace(/-/g, "")}`;
-      const r = await first<any>(
+      const r = await first<DbRow>(
         "createKioskDisplay",
         `insert into public.kiosk_displays (display_type, room_id, label, token)
          values ($1, $2, $3, $4)
@@ -841,21 +837,12 @@ export function createPostgresRepository(actorId: string | null): Repository {
         [input.displayType, input.roomId ?? null, input.label, token],
       );
       if (!r) throw new RepositoryError("unknown", "Failed to create kiosk display.");
-      return {
-        id: r.id,
-        token: r.token,
-        displayType: r.displayType,
-        roomId: r.roomId,
-        label: r.label,
-        isActive: Boolean(r.isActive),
-        lastSeenAt: r.lastSeenAt ? new Date(r.lastSeenAt).toISOString() : null,
-        createdAt: new Date(r.createdAt).toISOString(),
-      };
+      return mapKioskDisplay(r);
     },
 
     async revokeKioskDisplay(id) {
       try {
-        const rows = await query<any>(
+        const rows = await query<DbRow>(
           "revokeKioskDisplay",
           `update public.kiosk_displays
            set is_active = false
