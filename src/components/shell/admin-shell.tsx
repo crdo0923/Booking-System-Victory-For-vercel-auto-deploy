@@ -24,7 +24,7 @@ export function AdminShell({ user, pendingBookings, pendingUsers, children }: Ad
   const userSystemRole = user.systemRole || user.role;
 
   const allNav: (NavItem & { capability?: import("@/lib/data/types").SecurityCapability })[] = [
-    { href: "/admin", label: "Overview", icon: "overview" },
+    { href: "/admin", label: "Dashboard", icon: "dashboard" },
     { href: "/admin/bookings", label: "Booking requests", icon: "requests", matchPrefix: true, count: pendingBookings, capability: "bookings:approve" },
     { href: "/admin/rooms", label: "Rooms", icon: "rooms", matchPrefix: true, capability: "rooms:view" },
     { href: "/admin/assets", label: "Assets", icon: "assets", matchPrefix: true, capability: "assets:view" },
