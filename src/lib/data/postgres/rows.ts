@@ -392,12 +392,15 @@ export function toInventoryTransaction(row: InventoryTransactionRow): InventoryT
 }
 
 export interface ItemRequestRow {
-  id: string; booking_id: string; item_id: string | null; item_name: string; item_unit: InventoryUnit;
+  id: string; booking_id: string; requester_name: string; requester_email: string; event_name: string; room_name: string;
+  event_start_time: Timestamp; event_end_time: Timestamp; item_id: string | null; item_name: string; item_unit: InventoryUnit;
   quantity: number; notes: string | null; status: ItemRequestStatus; reviewed_by: string | null;
   reviewer_name?: string | null; reviewed_at: Timestamp | null; created_at: Timestamp; updated_at: Timestamp;
 }
 export function toItemRequest(row: ItemRequestRow): ItemRequest {
-  return { id: row.id, bookingId: row.booking_id, itemId: row.item_id, itemName: row.item_name, itemUnit: row.item_unit,
+  return { id: row.id, bookingId: row.booking_id, requesterName: row.requester_name, requesterEmail: row.requester_email,
+    eventName: row.event_name, roomName: row.room_name, eventStartTime: iso(row.event_start_time), eventEndTime: iso(row.event_end_time),
+    itemId: row.item_id, itemName: row.item_name, itemUnit: row.item_unit,
     quantity: Number(row.quantity), notes: row.notes, status: row.status, reviewedBy: row.reviewed_by,
     reviewerName: row.reviewer_name ?? null, reviewedAt: isoOrNull(row.reviewed_at), createdAt: iso(row.created_at), updatedAt: iso(row.updated_at) };
 }

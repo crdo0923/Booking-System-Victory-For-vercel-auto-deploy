@@ -976,31 +976,38 @@ export function createPostgresRepository(actorId: string | null): Repository {
       if (!requests.length) return [];
       const results = [];
       for (const request of requests) {
-        const row = await first<ItemRequestRow>("createItemRequest", `insert into public.item_requests (booking_id, item_id, quantity, notes)
-          values ($1,$2,$3,$4)
-          returning id, booking_id, item_id, coalesce((select name from public.inventory_items where id=item_id), notes, 'Other') as item_name,
-                    coalesce((select unit from public.inventory_items where id=item_id), 'pieces') as item_unit, quantity, notes, status,
-                    reviewed_by, reviewed_at, created_at, updated_at`, [bookingId, request.itemId, request.quantity, request.notes ?? null]);
-        if (row) results.push(toItemRequest(row));
+        const row = await first<{ id: string }>("createItemRequest", `insert into public.item_requests (booking_id, item_id, quantity, notes)
+          values ($1,$2,$3,$4) returning id`, [bookingId, request.itemId, request.quantity, request.notes ?? null]);
+        if (row) {
+          const full = await first<ItemRequestRow>("loadItemRequest", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name,
+            coalesce(i.unit, 'pieces') as item_unit, requester.full_name as requester_name, requester.email as requester_email,
+            b.event_name, rooms.name as room_name, b.start_time as event_start_time, b.end_time as event_end_time
+            from public.item_requests r
+            join public.bookings b on b.id=r.booking_id join public.profiles requester on requester.id=b.user_id
+            join public.rooms on rooms.id=b.room_id left join public.inventory_items i on i.id=r.item_id where r.id=$1`, [row.id]);
+          if (full) results.push(toItemRequest(full));
+        }
       }
       return results;
     },
 
     async listItemRequestsForBooking(bookingId) {
-      const rows = await query<ItemRequestRow>("listItemRequestsForBooking", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
-        from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
+      const rows = await query<ItemRequestRow>("listItemRequestsForBooking", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name,
+        requester.full_name as requester_name, requester.email as requester_email, b.event_name, rooms.name as room_name, b.start_time as event_start_time, b.end_time as event_end_time
+        from public.item_requests r join public.bookings b on b.id=r.booking_id join public.profiles requester on requester.id=b.user_id join public.rooms on rooms.id=b.room_id left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
         where r.booking_id=$1 order by r.created_at asc`, [bookingId]);
       return rows.map(toItemRequest);
     },
     async listItemRequestsForUser(userId) {
-      const rows = await query<ItemRequestRow>("listItemRequestsForUser", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
-        from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
-        join public.bookings b on b.id=r.booking_id where b.user_id=$1 order by r.created_at desc`, [userId]);
+      const rows = await query<ItemRequestRow>("listItemRequestsForUser", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name,
+        requester.full_name as requester_name, requester.email as requester_email, b.event_name, rooms.name as room_name, b.start_time as event_start_time, b.end_time as event_end_time
+        from public.item_requests r join public.bookings b on b.id=r.booking_id join public.profiles requester on requester.id=b.user_id join public.rooms on rooms.id=b.room_id left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by where b.user_id=$1 order by r.created_at desc`, [userId]);
       return rows.map(toItemRequest);
     },
     async listItemRequests(status?: ItemRequestStatus) {
-      const rows = await query<ItemRequestRow>("listItemRequests", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
-        from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
+      const rows = await query<ItemRequestRow>("listItemRequests", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name,
+        requester.full_name as requester_name, requester.email as requester_email, b.event_name, rooms.name as room_name, b.start_time as event_start_time, b.end_time as event_end_time
+        from public.item_requests r join public.bookings b on b.id=r.booking_id join public.profiles requester on requester.id=b.user_id join public.rooms on rooms.id=b.room_id left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by
         where ($1::text is null or r.status=$1) order by r.created_at desc`, [status ?? null]);
       return rows.map(toItemRequest);
     },
@@ -1014,8 +1021,9 @@ export function createPostgresRepository(actorId: string | null): Repository {
       try {
         const row = await first<ItemRequestRow>("updateItemRequestStatus", `select * from public.record_item_request_status($1,$2,$3)`, [id, status, note ?? null]);
         if (!row) return null;
-        const full = await first<ItemRequestRow>("reloadItemRequest", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name
-          from public.item_requests r left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by where r.id=$1`, [id]);
+        const full = await first<ItemRequestRow>("reloadItemRequest", `select r.*, coalesce(i.name, r.notes, 'Other') as item_name, coalesce(i.unit, 'pieces') as item_unit, p.full_name as reviewer_name,
+          requester.full_name as requester_name, requester.email as requester_email, b.event_name, rooms.name as room_name, b.start_time as event_start_time, b.end_time as event_end_time
+          from public.item_requests r join public.bookings b on b.id=r.booking_id join public.profiles requester on requester.id=b.user_id join public.rooms on rooms.id=b.room_id left join public.inventory_items i on i.id=r.item_id left join public.profiles p on p.id=r.reviewed_by where r.id=$1`, [id]);
         return full ? toItemRequest(full) : toItemRequest(row);
       } catch (error) {
         if (error instanceof Error && /forbidden/i.test(error.message)) throw new RepositoryError("forbidden", "Only administrators can update item requests.");

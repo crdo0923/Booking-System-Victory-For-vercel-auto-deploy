@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { updateItemRequestAction } from "@/app/actions/item-requests";
 import type { ItemRequest, ItemRequestHistory } from "@/lib/data/types";
 
+const formatDateTime = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+
 export function ItemRequestManager({ initialRequests, history }: { initialRequests: ItemRequest[]; history: Record<string, ItemRequestHistory[]> }) {
   const [requests, setRequests] = useState(initialRequests);
   const [pending, startTransition] = useTransition();
@@ -21,7 +23,12 @@ export function ItemRequestManager({ initialRequests, history }: { initialReques
         <li key={request.id} className="grid gap-3 py-5 lg:grid-cols-[minmax(0,1fr)_8rem_auto] lg:items-center">
           <div>
             <p className="font-bold">{request.quantity} × {request.itemName} <span className="font-normal text-muted">({request.itemUnit})</span></p>
-            <p className="mt-1 text-xs text-muted">Booking {request.bookingId} · Submitted {new Date(request.createdAt).toLocaleDateString()}</p>
+            <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-2">
+              <div><dt className="font-semibold text-ink-soft">Requested by</dt><dd>{request.requesterName} · {request.requesterEmail}</dd></div>
+              <div><dt className="font-semibold text-ink-soft">Requested</dt><dd><time dateTime={request.createdAt}>{formatDateTime(request.createdAt)}</time></dd></div>
+              <div><dt className="font-semibold text-ink-soft">Event</dt><dd>{request.eventName}</dd></div>
+              <div><dt className="font-semibold text-ink-soft">When &amp; where</dt><dd>{request.roomName} · <time dateTime={request.eventStartTime}>{formatDateTime(request.eventStartTime)}</time>–<time dateTime={request.eventEndTime}>{new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(new Date(request.eventEndTime))}</time></dd></div>
+            </dl>
             {request.notes && <p className="mt-2 text-sm text-ink-soft">{request.notes}</p>}
             {(history[request.id] ?? []).length > 0 && <details className="mt-2 text-xs text-muted"><summary className="cursor-pointer font-semibold">History</summary><ul className="mt-2 space-y-1">{history[request.id].map((event) => <li key={event.id}>{event.fromStatus ?? "new"} → {event.toStatus}{event.note ? ` · ${event.note}` : ""}</li>)}</ul></details>}
           </div>

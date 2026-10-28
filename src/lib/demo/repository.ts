@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { MAX_PENDING_PER_USER } from "@/lib/config";
 import { PENDING_LIMIT_MESSAGE, RepositoryError, type ImageStorage, type Repository } from "@/lib/data/repository";
-import type { AccessChange, AccessStatus, Announcement, AssetMovement, AuditLogEntry, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, Profile, RescheduleRequest, RescheduleStatus, RoomAsset } from "@/lib/data/types";
+import type { AccessChange, AccessStatus, Announcement, AssetMovement, AuditLogEntry, Booking, BookingDetails, BookingWithRoom, InventoryItem, InventoryReportSummary, InventoryTransaction, InventoryTransactionFilter, ItemRequest, Profile, RescheduleRequest, RescheduleStatus, RoomAsset } from "@/lib/data/types";
 import type { BookingStatus } from "@/lib/domain/booking-rules";
 import { rangesOverlap, toRange } from "@/lib/domain/availability";
 import { isBlockingStatus, PAST_DUE_MESSAGE, validateBookingWindow } from "@/lib/domain/booking-rules";
@@ -23,6 +23,21 @@ function toProfile(user: DemoUser): Profile {
     accessNotificationError: user.accessNotificationError,
     ghlContactId: user.ghlContactId,
     createdAt: user.createdAt,
+  };
+}
+
+function itemRequestDetails(state: DemoState, request: ItemRequest): ItemRequest {
+  const booking = state.bookings.find((entry) => entry.id === request.bookingId);
+  const requester = booking ? state.users.find((user) => user.id === booking.userId) : undefined;
+  const room = booking ? state.rooms.find((entry) => entry.id === booking.roomId) : undefined;
+  return {
+    ...request,
+    requesterName: requester?.fullName ?? "Unknown requester",
+    requesterEmail: requester?.email ?? "",
+    eventName: booking?.eventName ?? "Unknown event",
+    roomName: room?.name ?? "Unknown room",
+    eventStartTime: booking?.startTime ?? request.createdAt,
+    eventEndTime: booking?.endTime ?? request.createdAt,
   };
 }
 
@@ -795,18 +810,23 @@ export function createDemoRepository(actorId: string | null = null): Repository 
         const item = input.itemId ? state.inventoryItems?.find((i) => i.id === input.itemId) : null;
         if (input.itemId && !item) throw new RepositoryError("not_found", "Inventory item not found.");
         const now = new Date().toISOString();
-        const request = { id: randomUUID(), bookingId, itemId: item?.id ?? null, itemName: item?.name ?? input.notes ?? "Other", itemUnit: item?.unit ?? "pieces" as const, quantity: input.quantity, notes: input.notes ?? null, status: "submitted" as const, reviewedBy: null, reviewerName: null, reviewedAt: null, createdAt: now, updatedAt: now };
+        const request = itemRequestDetails(state, {
+          id: randomUUID(), bookingId, itemId: item?.id ?? null, itemName: item?.name ?? input.notes ?? "Other",
+          itemUnit: item?.unit ?? "pieces", quantity: input.quantity, notes: input.notes ?? null, status: "submitted",
+          reviewedBy: null, reviewerName: null, reviewedAt: null, createdAt: now, updatedAt: now,
+          requesterName: "", requesterEmail: "", eventName: "", roomName: "", eventStartTime: now, eventEndTime: now,
+        });
         itemRequests.push(request);
         itemRequestHistory.push({ id: randomUUID(), itemRequestId: request.id, fromStatus: null, toStatus: "submitted" as const, changedBy: actorId, changedByName: state.users.find((u) => u.id === actorId)?.fullName ?? null, note: null, createdAt: now });
         return copy(request);
       });
     },
-    async listItemRequestsForBooking(bookingId) { return copy((state.itemRequests ?? []).filter((r) => r.bookingId === bookingId)); },
+    async listItemRequestsForBooking(bookingId) { return copy((state.itemRequests ?? []).filter((r) => r.bookingId === bookingId).map((r) => itemRequestDetails(state, r))); },
     async listItemRequestsForUser(userId) {
       const bookingIds = state.bookings.filter((b) => b.userId === userId).map((b) => b.id);
-      return copy((state.itemRequests ?? []).filter((r) => bookingIds.includes(r.bookingId)));
+      return copy((state.itemRequests ?? []).filter((r) => bookingIds.includes(r.bookingId)).map((r) => itemRequestDetails(state, r)));
     },
-    async listItemRequests(status) { return copy((state.itemRequests ?? []).filter((r) => !status || r.status === status)); },
+    async listItemRequests(status) { return copy((state.itemRequests ?? []).filter((r) => !status || r.status === status).map((r) => itemRequestDetails(state, r))); },
     async listItemRequestHistory(requestId) { return copy((state.itemRequestHistory ?? []).filter((h) => h.itemRequestId === requestId).reverse()); },
     async updateItemRequestStatus(id, status, note) {
       if (!actorIsActiveAdmin()) throw new RepositoryError("forbidden", "Only administrators can update item requests.");
@@ -824,7 +844,7 @@ export function createDemoRepository(actorId: string | null = null): Repository 
       request.updatedAt = request.reviewedAt;
       state.itemRequestHistory ??= [];
       state.itemRequestHistory.push({ id: randomUUID(), itemRequestId: id, fromStatus, toStatus: status, changedBy: actorId, changedByName: request.reviewerName, note: note ?? null, createdAt: request.reviewedAt });
-      return copy(request);
+      return copy(itemRequestDetails(state, request));
     },
     async createShuttleRequest(input) {
       state.shuttles ??= [];

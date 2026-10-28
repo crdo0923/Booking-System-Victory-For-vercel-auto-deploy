@@ -107,7 +107,16 @@ export default async function MyBookingsPage({ searchParams }: PageProps<"/booki
           <ul className="mt-4 divide-y divide-line">
             {itemRequests.map((request) => (
               <li key={request.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <span className="font-semibold">{request.quantity} × {request.itemName}</span>
+                <div className="min-w-0">
+                  <p className="font-semibold">{request.quantity} × {request.itemName}</p>
+                  <dl className="mt-1 grid gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-2">
+                    <div><dt className="font-semibold text-ink-soft">Requested by</dt><dd>{request.requesterName} · {request.requesterEmail}</dd></div>
+                    <div><dt className="font-semibold text-ink-soft">Requested</dt><dd><time dateTime={request.createdAt}>{formatDate(request.createdAt, "MMM d, yyyy 'at' h:mm a")}</time></dd></div>
+                    <div><dt className="font-semibold text-ink-soft">Event</dt><dd>{request.eventName}</dd></div>
+                    <div><dt className="font-semibold text-ink-soft">Room</dt><dd>{request.roomName}</dd></div>
+                    <div><dt className="font-semibold text-ink-soft">Event time</dt><dd><time dateTime={request.eventStartTime}>{formatDate(request.eventStartTime, "MMM d, yyyy 'at' h:mm a")}</time>–{formatDate(request.eventEndTime, "h:mm a")}</dd></div>
+                  </dl>
+                </div>
                 <span className="eyebrow text-muted">{request.status[0].toUpperCase() + request.status.slice(1)}</span>
                 {(itemRequestHistory[request.id] ?? []).length > 0 && (
                   <details className="w-full text-xs text-muted">

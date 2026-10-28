@@ -341,6 +341,12 @@ export type ItemRequestStatus = "submitted" | "approved" | "fulfilled" | "reject
 export interface ItemRequest {
   id: string;
   bookingId: string;
+  requesterName: string;
+  requesterEmail: string;
+  eventName: string;
+  roomName: string;
+  eventStartTime: string;
+  eventEndTime: string;
   itemId: string | null;
   itemName: string;
   itemUnit: InventoryUnit;
