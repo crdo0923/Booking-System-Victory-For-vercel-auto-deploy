@@ -24,7 +24,8 @@ async function setSession(userId: string) {
   const store = await cookies();
   store.set(DEMO_SESSION_COOKIE, sign(userId), {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "none",
+    secure: true,
     path: "/",
     maxAge: 60 * 60 * 12,
   });
