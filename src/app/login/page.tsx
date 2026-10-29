@@ -5,6 +5,7 @@ import { safeRedirectPath } from "@/lib/utils";
 import { firstParam } from "@/lib/validation/params";
 import { AuthForm } from "@/components/auth/auth-form";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { IframeSessionSync } from "@/components/auth/iframe-session-sync";
 import { QuickSignInSelector, type DemoQuickAccount } from "@/components/auth/quick-sign-in-selector";
 import { Notice } from "@/components/ui/notice";
 import { DEMO_ACCOUNTS } from "@/lib/demo/seed";
@@ -70,6 +71,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <AuthLayout footer="For Victory members, volunteers and staff.">
+      <IframeSessionSync next={next} />
+
       {passwordReset && (
         <Notice tone="success" className="mb-8">
           Password updated. Sign in with your new password.

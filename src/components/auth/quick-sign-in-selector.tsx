@@ -10,6 +10,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { quickSignInAction } from "@/app/actions/auth";
+import { setStoredDemoUser } from "@/lib/auth/demo-storage";
 
 export interface DemoQuickAccount {
   email: string;
@@ -42,6 +43,7 @@ export function QuickSignInSelector({ accounts, next }: QuickSignInSelectorProps
   function handleSelect(email: string) {
     setSigningEmail(email);
     setError(null);
+    setStoredDemoUser(email);
 
     startTransition(async () => {
       const res = await quickSignInAction(email, next);

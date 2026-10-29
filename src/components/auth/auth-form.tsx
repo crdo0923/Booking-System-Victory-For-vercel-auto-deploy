@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { requestPasswordResetAction, signInAction, signUpAction, type AuthFormState } from "@/app/actions/auth";
+import { setStoredDemoUser } from "@/lib/auth/demo-storage";
 import { describedBy, Field, Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -37,7 +38,17 @@ function ModeForm({ mode, next, onModeChange }: { mode: Mode; next: string; onMo
       <h1 className="headline text-2xl sm:text-3xl">{text.title}</h1>
       <p className="mt-1.5 text-sm text-muted">{text.lede}</p>
 
-      <form action={formAction} className="mt-4 space-y-3" noValidate>
+      <form
+        action={(formData) => {
+          const email = formData.get("email");
+          if (typeof email === "string" && email.trim()) {
+            setStoredDemoUser(email.trim());
+          }
+          return formAction(formData);
+        }}
+        className="mt-4 space-y-3"
+        noValidate
+      >
         <input type="hidden" name="next" value={next} />
         {state.error && <Notice tone="error">{state.error}</Notice>}
         {state.message && <Notice tone="success">{state.message}</Notice>}

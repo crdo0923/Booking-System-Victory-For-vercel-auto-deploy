@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import { LogOut } from "lucide-react";
-import { signOutAction } from "@/app/actions/auth";
 import { requireUser } from "@/lib/auth/session";
 import { getRepositoryForRequest } from "@/lib/data/queries";
 import { formatPhone } from "@/lib/domain/phone";
@@ -10,9 +8,9 @@ import { getGoogleCalendar } from "@/lib/google/gateway";
 import { firstParam } from "@/lib/validation/params";
 import { GoogleCalendarRow } from "@/components/account/google-calendar-row";
 import { PasswordForm } from "@/components/account/password-form";
+import { SignOutForm } from "@/components/shell/sign-out-form";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
-import { SubmitButton } from "@/components/ui/submit-button";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -81,12 +79,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       </SettingsSection>
 
       <SettingsSection title="Sign out">
-        <form action={signOutAction}>
-          <SubmitButton variant="secondary" pendingLabel="Signing out…">
-            <LogOut className="size-4" aria-hidden />
-            Sign out
-          </SubmitButton>
-        </form>
+        <SignOutForm variant="secondary" />
       </SettingsSection>
     </div>
   );

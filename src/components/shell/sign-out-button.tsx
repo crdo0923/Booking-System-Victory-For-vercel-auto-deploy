@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { LogOut } from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
+import { clearStoredDemoUser } from "@/lib/auth/demo-storage";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +17,7 @@ export function SignOutButton({ variant = "icon" }: SignOutButtonProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleSignOut = () => {
+    clearStoredDemoUser();
     startTransition(async () => {
       await signOutAction();
     });

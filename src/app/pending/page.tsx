@@ -2,13 +2,11 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LogOut } from "lucide-react";
-import { signOutAction } from "@/app/actions/auth";
 import { requireSignedIn } from "@/lib/auth/session";
 import { formatPhone } from "@/lib/domain/phone";
 import { firstName } from "@/lib/utils";
 import { buttonStyles } from "@/components/ui/button";
-import { SubmitButton } from "@/components/ui/submit-button";
+import { SignOutForm } from "@/components/shell/sign-out-form";
 
 export const metadata: Metadata = { title: "Account status" };
 
@@ -75,12 +73,7 @@ export default async function PendingPage() {
               Check again
             </Link>
           )}
-          <form action={signOutAction}>
-            <SubmitButton variant="quiet" pendingLabel="Signing out…">
-              <LogOut className="size-4" aria-hidden />
-              Sign out
-            </SubmitButton>
-          </form>
+          <SignOutForm variant="quiet" />
         </div>
       </div>
     </main>

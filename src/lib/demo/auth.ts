@@ -28,6 +28,7 @@ async function setSession(userId: string) {
     secure: true,
     path: "/",
     maxAge: 60 * 60 * 12,
+    partitioned: true,
   });
 }
 
