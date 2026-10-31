@@ -40,7 +40,42 @@ export function createDemoAuthProvider(): AuthProvider {
     async getCurrentUser() {
       const store = await cookies();
       const userId = verify(store.get(DEMO_SESSION_COOKIE)?.value);
-      const user = userId ? state.users.find((u) => u.id === userId) : undefined;
+      if (!userId) return null;
+
+      let user = state.users.find((u) => u.id === userId);
+      if (!user) {
+        // Fallback/rehydrate if userId matches a known seeded account
+        const { DEMO_ACCOUNTS, DEMO_USER_IDS, DEMO_PASSWORD } = await import("@/lib/demo/seed");
+        const entry = Object.entries(DEMO_ACCOUNTS).find(([key]) => {
+          const idKey = key === "facility_team" ? "facilityTeam" : key === "pastoral_staff" ? "pastoralStaff" : key;
+          return DEMO_USER_IDS[idKey as keyof typeof DEMO_USER_IDS] === userId;
+        });
+
+        if (entry) {
+          const [, account] = entry;
+          const nowIso = new Date().toISOString();
+          user = {
+            id: userId,
+            email: account.email,
+            fullName: account.fullName,
+            phone: "+639170000000",
+            role: account.role as "admin" | "user",
+            systemRole: account.systemRole,
+            accessStatus: account.systemRole === "guest" ? "pending" : "active",
+            accessReason: null,
+            accessReviewedAt: account.systemRole === "guest" ? null : nowIso,
+            accessNotificationError: null,
+            ghlContactId: null,
+            passwordHash: hashDemoPassword(DEMO_PASSWORD),
+            createdAt: nowIso,
+          };
+          state.users.push(user);
+          if (user.accessStatus === "active") {
+            state.googleConnections.add(user.id);
+          }
+        }
+      }
+
       return user
         ? {
             id: user.id,
@@ -59,12 +94,15 @@ export function createDemoAuthProvider(): AuthProvider {
       let user = state.users.find((u) => u.email === email);
       if (!user) {
         // Auto-provision demo account if matching known DEMO_ACCOUNTS
-        const { DEMO_ACCOUNTS, DEMO_PASSWORD } = await import("@/lib/demo/seed");
-        const account = Object.values(DEMO_ACCOUNTS).find((acc) => acc.email === email);
-        if (account) {
+        const { DEMO_ACCOUNTS, DEMO_USER_IDS, DEMO_PASSWORD } = await import("@/lib/demo/seed");
+        const entry = Object.entries(DEMO_ACCOUNTS).find(([, acc]) => acc.email === email);
+        if (entry) {
+          const [key, account] = entry;
+          const idKey = key === "facility_team" ? "facilityTeam" : key === "pastoral_staff" ? "pastoralStaff" : key;
+          const deterministicId = DEMO_USER_IDS[idKey as keyof typeof DEMO_USER_IDS] ?? randomUUID();
           const nowIso = new Date().toISOString();
           const newUser: typeof state.users[number] = {
-            id: randomUUID(),
+            id: deterministicId,
             email: account.email,
             fullName: account.fullName,
             phone: "+639170000099",

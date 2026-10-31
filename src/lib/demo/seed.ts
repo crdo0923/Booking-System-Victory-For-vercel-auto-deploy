@@ -67,6 +67,8 @@ const ids = {
   guest: "8f3c1a52-1b7e-4c1a-9a51-0a0000000007",
 };
 
+export const DEMO_USER_IDS = ids;
+
 function room(index: number, fields: Omit<Room, "id" | "isActive" | "displayOrder" | "imagePath" | "mapImagePath" | "ghlCalendarId">): Room {
   return {
     id: `5b0d7e10-3c2a-4f1e-8b6d-10000000000${index}`,
@@ -153,12 +155,21 @@ export function createDemoSeed(): DemoState {
   const day = (offset: number) => addDaysToKey(today, offset);
   const passwordHash = hashDemoPassword(DEMO_PASSWORD);
 
-  const user = (id: string, email: string, fullName: string, phone: string, role: DemoUser["role"], accessStatus: DemoUser["accessStatus"]): DemoUser => ({
+  const user = (
+    id: string,
+    email: string,
+    fullName: string,
+    phone: string,
+    role: DemoUser["role"],
+    accessStatus: DemoUser["accessStatus"],
+    systemRole?: DemoUser["systemRole"],
+  ): DemoUser => ({
     id,
     email,
     fullName,
     phone,
     role,
+    systemRole,
     accessStatus,
     accessReason: null,
     accessReviewedAt: accessStatus === "pending" ? null : nowIso,
@@ -169,10 +180,13 @@ export function createDemoSeed(): DemoState {
   });
 
   const users: DemoUser[] = [
-    user(ids.admin, DEMO_ACCOUNTS.admin.email, DEMO_ACCOUNTS.admin.fullName, "+639170000001", "admin", "active"),
-    user(ids.member, DEMO_ACCOUNTS.member.email, DEMO_ACCOUNTS.member.fullName, "+639170000002", "user", "active"),
-    user(ids.memberTwo, "paolo@victory.test", "Paolo Reyes", "+639170000003", "user", "active"),
-    user(ids.pending, DEMO_ACCOUNTS.pending.email, DEMO_ACCOUNTS.pending.fullName, "+639170000004", "user", "pending"),
+    user(ids.admin, DEMO_ACCOUNTS.admin.email, DEMO_ACCOUNTS.admin.fullName, "+639170000001", "admin", "active", "admin"),
+    user(ids.facilityTeam, DEMO_ACCOUNTS.facility_team.email, DEMO_ACCOUNTS.facility_team.fullName, "+639170000005", "admin", "active", "facility_team"),
+    user(ids.pastoralStaff, DEMO_ACCOUNTS.pastoral_staff.email, DEMO_ACCOUNTS.pastoral_staff.fullName, "+639170000006", "admin", "active", "pastoral_staff"),
+    user(ids.member, DEMO_ACCOUNTS.member.email, DEMO_ACCOUNTS.member.fullName, "+639170000002", "user", "active", "member"),
+    user(ids.memberTwo, "paolo@victory.test", "Paolo Reyes", "+639170000003", "user", "active", "member"),
+    user(ids.guest, DEMO_ACCOUNTS.guest.email, DEMO_ACCOUNTS.guest.fullName, "+639170000007", "user", "pending", "guest"),
+    user(ids.pending, DEMO_ACCOUNTS.pending.email, DEMO_ACCOUNTS.pending.fullName, "+639170000004", "user", "pending", "guest"),
   ];
 
   const booking = (
@@ -974,8 +988,8 @@ export function createDemoSeed(): DemoState {
     files: new Map(),
     appointments: new Map(),
     ghlContacts: new Map(),
-    // The seeded member has already connected Google Calendar; new accounts have not.
-    googleConnections: new Set([ids.admin, ids.member, ids.memberTwo]),
+    // The seeded active accounts have connected Google Calendar; pending accounts have not.
+    googleConnections: new Set([ids.admin, ids.facilityTeam, ids.pastoralStaff, ids.member, ids.memberTwo]),
     googleEvents: new Map(),
     sessionSecret: getDemoSessionSecret(),
   };
