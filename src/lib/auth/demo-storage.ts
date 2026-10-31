@@ -1,4 +1,5 @@
 export const DEMO_USER_STORAGE_KEY = "vr_demo_user";
+export const LAST_ACTIVE_PATH_KEY = "vr_last_active_path";
 
 export function getStoredDemoUser(): string | null {
   if (typeof window === "undefined") return null;
@@ -22,6 +23,37 @@ export function clearStoredDemoUser(): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(DEMO_USER_STORAGE_KEY);
+    localStorage.removeItem(LAST_ACTIVE_PATH_KEY);
+  } catch {
+    // ignore localStorage errors
+  }
+}
+
+export function getStoredLastPath(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const path = localStorage.getItem(LAST_ACTIVE_PATH_KEY);
+    if (!path || !path.startsWith("/") || path.startsWith("//")) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredLastPath(path: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (path.startsWith("/login") || path.startsWith("/api") || path === "/") return;
+    localStorage.setItem(LAST_ACTIVE_PATH_KEY, path);
+  } catch {
+    // ignore localStorage errors
+  }
+}
+
+export function clearStoredLastPath(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(LAST_ACTIVE_PATH_KEY);
   } catch {
     // ignore localStorage errors
   }

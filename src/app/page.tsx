@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { unstable_rethrow } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { connection } from "next/server";
 import { getCurrentUser, type SessionUser } from "@/lib/auth/session";
 import { APP_NAME } from "@/lib/config";
 import { PublicShell } from "@/components/public/public-shell";
+import { IframeSessionSync } from "@/components/auth/iframe-session-sync";
 import { buttonStyles } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -32,11 +33,12 @@ export default async function HomePage() {
     console.error("[home] session lookup failed:", error instanceof Error ? error.message : error);
   }
 
-  const actions = user ? (
-    <Link href="/portal" className={buttonStyles({ size: "sm" })}>
-      Open portal
-    </Link>
-  ) : (
+  // If already authenticated, redirect straight to portal (which resolves to /admin or /dashboard)
+  if (user) {
+    redirect("/portal");
+  }
+
+  const actions = (
     <>
       <Link href="/login" className={buttonStyles({ variant: "quiet", size: "sm" })}>
         Sign in
@@ -52,6 +54,7 @@ export default async function HomePage() {
       <div className="mx-auto flex h-full max-w-6xl flex-1 items-center px-6 py-6 sm:px-10 lg:py-8">
         <div className="grid w-full gap-10 lg:grid-cols-12 lg:gap-14 items-center">
           <section aria-labelledby="intro-heading" className="lg:col-span-6">
+            <IframeSessionSync />
             <p className="eyebrow text-muted">Victory Church · Facilities</p>
             <h1 id="intro-heading" className="headline mt-3 text-4xl sm:text-5xl lg:text-[3.25rem] leading-[1.08]">
               Victory Booking System
@@ -64,22 +67,13 @@ export default async function HomePage() {
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              {user ? (
-                <Link href="/portal" className={buttonStyles({ size: "md" })}>
-                  Open portal
-                </Link>
-              ) : (
-                <>
-                  <Link href="/login" className={buttonStyles({ size: "md" })}>
-                    Sign in
-                  </Link>
-                  <Link href="/login?mode=signup" className={buttonStyles({ variant: "secondary", size: "md" })}>
-                    Create account
-                  </Link>
-                </>
-              )}
+              <Link href="/login" className={buttonStyles({ size: "md" })}>
+                Sign in
+              </Link>
+              <Link href="/login?mode=signup" className={buttonStyles({ variant: "secondary", size: "md" })}>
+                Create account
+              </Link>
             </div>
-            {user && <p className="mt-3 text-xs text-muted">Signed in as {user.email}.</p>}
           </section>
 
           <section aria-labelledby="how-heading" className="lg:col-span-6">

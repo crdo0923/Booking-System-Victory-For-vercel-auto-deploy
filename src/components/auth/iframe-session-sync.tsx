@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredDemoUser, isIframeEnvironment } from "@/lib/auth/demo-storage";
+import { getStoredDemoUser, getStoredLastPath, isIframeEnvironment } from "@/lib/auth/demo-storage";
 
-export function IframeSessionSync({ next = "/portal" }: { next?: string }) {
+export function IframeSessionSync({ next }: { next?: string }) {
   const router = useRouter();
   const [rehydrating, setRehydrating] = useState(() => {
     return isIframeEnvironment() && Boolean(getStoredDemoUser());
@@ -27,7 +27,8 @@ export function IframeSessionSync({ next = "/portal" }: { next?: string }) {
         });
 
         if (res.ok && isMounted) {
-          router.replace(next || "/portal");
+          const target = next || getStoredLastPath() || "/portal";
+          router.replace(target);
           router.refresh();
         } else if (isMounted) {
           setRehydrating(false);

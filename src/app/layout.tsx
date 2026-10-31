@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Newsreader, Nunito_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { APP_NAME } from "@/lib/config";
+import { RouteTracker } from "@/components/auth/route-tracker";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${nunitoSans.variable} ${newsreader.variable} h-full`}>
       <body className="flex min-h-full flex-col">
+        <RouteTracker />
         {children}
         <Toaster
           position="bottom-center"

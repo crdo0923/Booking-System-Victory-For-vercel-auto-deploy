@@ -1,12 +1,30 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth/session";
 import { APP_NAME } from "@/lib/config";
 import { buttonStyles } from "@/components/ui/button";
 import { SkipLink } from "@/components/shell/member-shell";
 
 /** Header + footer for the public pages (home, privacy, terms). */
-export function PublicShell({ actions, children }: { actions?: ReactNode; children: ReactNode }) {
+export async function PublicShell({ actions, children }: { actions?: ReactNode; children: ReactNode }) {
+  let user = null;
+  try {
+    user = await getCurrentUser();
+  } catch {
+    // ignore
+  }
+
+  const defaultActions = user ? (
+    <Link href="/portal" className={buttonStyles({ size: "sm" })}>
+      Open portal
+    </Link>
+  ) : (
+    <Link href="/login" className={buttonStyles({ variant: "secondary", size: "sm" })}>
+      Sign in
+    </Link>
+  );
+
   return (
     <>
       <SkipLink />
@@ -16,11 +34,7 @@ export function PublicShell({ actions, children }: { actions?: ReactNode; childr
             <Image src="/brand/victory-logo.png" alt="Victory — Honor God. Make Disciples." width={654} height={132} loading="eager" className="h-auto w-36 sm:w-40" />
           </Link>
           <div className="flex items-center gap-2">
-            {actions ?? (
-              <Link href="/login" className={buttonStyles({ variant: "secondary", size: "sm" })}>
-                Sign in
-              </Link>
-            )}
+            {actions ?? defaultActions}
           </div>
         </div>
       </header>
@@ -41,9 +55,15 @@ export function PublicShell({ actions, children }: { actions?: ReactNode; childr
             <Link href="/terms" className="hover:text-ink hover:underline">
               Terms of Use
             </Link>
-            <Link href="/login" className="hover:text-ink hover:underline">
-              Sign In
-            </Link>
+            {user ? (
+              <Link href="/portal" className="hover:text-ink hover:underline">
+                Portal
+              </Link>
+            ) : (
+              <Link href="/login" className="hover:text-ink hover:underline">
+                Sign In
+              </Link>
+            )}
           </nav>
         </div>
       </footer>
